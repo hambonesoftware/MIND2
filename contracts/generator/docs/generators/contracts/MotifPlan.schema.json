@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "required": [
+    "scheme",
+    "motifCells",
+    "transformsByPhrase"
+  ],
+  "properties": {
+    "scheme": {
+      "type": "string"
+    },
+    "motifCells": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "transformsByPhrase": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

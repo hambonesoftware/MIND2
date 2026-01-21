@@ -1,0 +1,49 @@
+{
+  "type": "object",
+  "required": [
+    "id",
+    "severity",
+    "category",
+    "message",
+    "paths"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "ERROR",
+        "WARN",
+        "INFO"
+      ]
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "LEGality",
+        "STYLE",
+        "MUST_MOVE",
+        "DETERMINISM",
+        "ARRANGEMENT",
+        "RENDER"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "paths": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "evidence": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  }
+}

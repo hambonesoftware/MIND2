@@ -1,0 +1,67 @@
+{
+  "type": "object",
+  "required": [
+    "thoughtId",
+    "validatorVersion",
+    "passed",
+    "summary",
+    "violations"
+  ],
+  "properties": {
+    "thoughtId": {
+      "type": "string"
+    },
+    "validatorVersion": {
+      "type": "string"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "errorCount",
+        "warnCount",
+        "infoCount"
+      ],
+      "properties": {
+        "errorCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warnCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "infoCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "computedMetrics": {
+      "type": "object"
+    },
+    "mustMoveResults": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "determinism": {
+      "type": "object"
+    },
+    "suggestedRepairs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

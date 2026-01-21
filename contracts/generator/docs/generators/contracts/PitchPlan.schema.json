@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "required": [
+    "allowedPitchClasses",
+    "pitchWeights",
+    "voiceLeadingRules",
+    "register"
+  ],
+  "properties": {
+    "allowedPitchClasses": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 11
+      }
+    },
+    "pitchWeights": {
+      "type": "object"
+    },
+    "voiceLeadingRules": {
+      "type": "object"
+    },
+    "register": {
+      "type": "object"
+    }
+  }
+}

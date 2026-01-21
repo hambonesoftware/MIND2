@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "required": [
+    "grid",
+    "onsetMaskByPart",
+    "accentModel",
+    "microtiming"
+  ],
+  "properties": {
+    "grid": {
+      "type": "string"
+    },
+    "onsetMaskByPart": {
+      "type": "object"
+    },
+    "accentModel": {
+      "type": "object"
+    },
+    "microtiming": {
+      "type": "object"
+    }
+  }
+}

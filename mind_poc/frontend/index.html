@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MIND PoC Node Canvas</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Inter", system-ui, sans-serif;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      #app {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 16px 24px;
+      }
+      .app-header {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .canvas-wrap {
+        background: #0f172a;
+        border-radius: 12px;
+        padding: 8px;
+      }
+      #graph-canvas {
+        display: block;
+        width: 100%;
+        height: 700px;
+        background: #0b1220;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <h1>MIND v2.0 PoC</h1>
+        <p>Drop a MusicalThought node and type a DSL pattern.</p>
+      </header>
+      <div class="canvas-wrap">
+        <canvas id="graph-canvas" width="1200" height="700"></canvas>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

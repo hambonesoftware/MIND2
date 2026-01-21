@@ -1,5 +1,11 @@
 # MIND PoC
 
+## Run everything
+From the repository root:
+```bash
+python run.py
+```
+
 ## Backend
 
 ### Setup

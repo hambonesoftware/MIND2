@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "thought.v0.schema.json",
+  "title": "Thought v0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "node_id",
+    "status",
+    "style_profile",
+    "meta",
+    "sequence"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "thought.v0"
+    },
+    "node_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "muted", "error"]
+    },
+    "style_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "meta": {
+      "type": "object",
+      "required": ["tempo", "time_signature", "loop_bars", "division"],
+      "properties": {
+        "tempo": {
+          "type": "number",
+          "minimum": 1
+        },
+        "time_signature": {
+          "type": "string",
+          "pattern": "^\\d+\\/\\d+$"
+        },
+        "loop_bars": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "division": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "sequence": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/definitions/noteEvent" },
+          { "$ref": "#/definitions/muteEvent" },
+          { "$ref": "#/definitions/ccEvent" }
+        ]
+      }
+    }
+  },
+  "additionalProperties": true,
+  "definitions": {
+    "timeString": {
+      "type": "string",
+      "pattern": "^\\d+:\\d+:\\d+$"
+    },
+    "noteEvent": {
+      "type": "object",
+      "required": ["time", "type", "velocity", "midi"],
+      "properties": {
+        "time": { "$ref": "#/definitions/timeString" },
+        "type": { "const": "note" },
+        "velocity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "midi": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127
+        },
+        "duration": {
+          "oneOf": [
+            { "$ref": "#/definitions/timeString" },
+            { "type": "number", "minimum": 0 }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "muteEvent": {
+      "type": "object",
+      "required": ["time", "type", "velocity"],
+      "properties": {
+        "time": { "$ref": "#/definitions/timeString" },
+        "type": { "const": "mute" },
+        "velocity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "midi": {
+          "type": "null"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ccEvent": {
+      "type": "object",
+      "required": ["time", "type", "velocity", "cc", "value"],
+      "properties": {
+        "time": { "$ref": "#/definitions/timeString" },
+        "type": { "const": "cc" },
+        "velocity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cc": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

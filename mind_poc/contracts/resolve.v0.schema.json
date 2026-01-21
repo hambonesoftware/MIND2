@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resolve.v0.schema.json",
+  "title": "Resolve v0",
+  "type": "object",
+  "required": ["schema_version", "style_profile", "resolved"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "resolve.v0"
+    },
+    "style_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/resolveInput"
+      }
+    },
+    "resolved": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/resolveOutput"
+      }
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "clashes_detected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/actionTrace"
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "definitions": {
+    "resolveInput": {
+      "type": "object",
+      "required": ["node_id", "thought"],
+      "properties": {
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": ["bass", "lead", "pad", "drums"]
+        },
+        "thought": {
+          "$ref": "thought.v0.schema.json"
+        }
+      },
+      "additionalProperties": false
+    },
+    "resolveOutput": {
+      "type": "object",
+      "required": ["node_id", "thought"],
+      "properties": {
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thought": {
+          "$ref": "thought.v0.schema.json"
+        }
+      },
+      "additionalProperties": false
+    },
+    "actionTrace": {
+      "type": "object",
+      "required": ["time", "node_id", "action"],
+      "properties": {
+        "time": {
+          "type": "string",
+          "pattern": "^\\d+:\\d+:\\d+$"
+        },
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "enum": ["shift", "drop", "revoice"]
+        },
+        "semitones": {
+          "type": "integer",
+          "minimum": -24,
+          "maximum": 24
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

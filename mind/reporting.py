@@ -94,6 +94,8 @@ def build_song_report(
                 "pc_names": [pc_to_name(p) for p in seg.pcs],
                 "is_borrowed": seg.is_borrowed,
                 "template_tag": seg.template_tag,
+                "inversion": seg.chord.inversion,
+                "function": seg.chord.function,
             }
         )
 

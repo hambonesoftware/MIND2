@@ -340,7 +340,16 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
     segments: list[ChordSegment] = []
 
     length = max(1, int(ctrl.length_bars))
+    style_key = (ctrl.progression_style or "pop").strip().lower()
     base_two_prob = clamp01(lerp(0.06, 0.40, (ctrl.density * 0.55 + ctrl.variation * 0.45)))
+    if style_key == "jazz":
+        base_two_prob = clamp01(base_two_prob * 1.55 + 0.12)
+    elif style_key == "pop":
+        base_two_prob = clamp01(base_two_prob * 0.55)
+    elif style_key == "classical":
+        base_two_prob = clamp01(base_two_prob * 0.90)
+
+    forced_tokens: dict[int, tuple[object, str | None]] = {}
 
     for bar in range(length):
         mod = plan.bar_mods[bar]
@@ -351,10 +360,71 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
 
         pos_in_phrase = bar % plan.phrase_len_bars
         token = degrees[pos_in_phrase % len(degrees)]
+        forced_label = None
+        if bar in forced_tokens:
+            token, forced_label = forced_tokens.pop(bar)
 
         do_turnaround = False
         if mod.is_phrase_end and bar != length - 1:
             do_turnaround = (rng.random() < clamp01(lerp(0.20, 0.75, ctrl.cadence_strength)))
+
+        cadence_prob = clamp01(lerp(0.25, 0.85, ctrl.cadence_strength))
+        if style_key == "jazz":
+            cadence_prob = clamp01(cadence_prob * 1.15)
+        elif style_key == "pop":
+            cadence_prob = clamp01(cadence_prob * 0.75)
+        elif style_key == "classical":
+            cadence_prob = clamp01(cadence_prob * 1.20)
+
+        if mod.is_phrase_end and rng.random() < cadence_prob:
+            cadence_choice = None
+            if style_key == "jazz":
+                cadence_choice = pick_weighted(rng, [("ii_V_I", 0.70), ("V_I", 0.30)])
+            elif style_key == "classical":
+                cadence_choice = pick_weighted(rng, [("V_I", 0.55), ("ii_V_I", 0.45)])
+            else:
+                cadence_choice = pick_weighted(rng, [("V_I", 0.70), ("IV_I", 0.30)])
+
+            if cadence_choice == "ii_V_I":
+                tok1, tok2 = 1, 4
+                lab1, lab2 = "ii", "V"
+                if bar + 1 < length:
+                    forced_tokens[bar + 1] = (0, "I")
+            elif cadence_choice == "IV_I":
+                tok1, tok2 = 3, 0
+                lab1, lab2 = "IV", "I"
+            else:
+                tok1, tok2 = 4, 0
+                lab1, lab2 = "V", "I"
+
+            seg1 = make_chord_segment(
+                ctrl=ctrl,
+                tonic_pc=tonic_pc,
+                bar=bar,
+                start_step=0,
+                end_step=8,
+                token=tok1,
+                forced_label=lab1,
+                section=section,
+                template_tag=f"{tpl_name}|cadence",
+                rng=rng,
+                plan=plan,
+            )
+            seg2 = make_chord_segment(
+                ctrl=ctrl,
+                tonic_pc=tonic_pc,
+                bar=bar,
+                start_step=8,
+                end_step=16,
+                token=tok2,
+                forced_label=lab2,
+                section=section,
+                template_tag=f"{tpl_name}|cadence",
+                rng=rng,
+                plan=plan,
+            )
+            segments.extend([seg1, seg2])
+            continue
 
         if bar == length - 1 and ctrl.cadence_strength >= 0.45:
             cadence_choice = pick_weighted(rng, [("V_I", 0.75), ("IV_I", 0.25)])
@@ -449,7 +519,7 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
                 start_step=0,
                 end_step=8,
                 token=token,
-                forced_label=None,
+                forced_label=forced_label,
                 section=section,
                 template_tag=tpl_name,
                 rng=rng,
@@ -477,7 +547,7 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
                 start_step=0,
                 end_step=16,
                 token=token,
-                forced_label=None,
+                forced_label=forced_label,
                 section=section,
                 template_tag=tpl_name,
                 rng=rng,

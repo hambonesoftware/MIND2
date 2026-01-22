@@ -40,6 +40,7 @@ class App(tk.Tk):
         self.var_bpm = tk.IntVar(value=120)
         self.var_key = tk.StringVar(value="C")
         self.var_mode = tk.StringVar(value="major")
+        self.var_progression_style = tk.StringVar(value="pop")
 
         self.var_density = tk.DoubleVar(value=0.55)
         self.var_syncopation = tk.DoubleVar(value=0.30)
@@ -120,6 +121,19 @@ class App(tk.Tk):
         mode_combo = ttk.Combobox(row2, textvariable=self.var_mode, values=["major", "minor"], state="readonly", width=8)
         mode_combo.pack(side="left")
         mode_combo.bind("<<ComboboxSelected>>", lambda e: self._regenerate())
+
+        row3 = ttk.Frame(grp_basic)
+        row3.pack(fill="x", pady=4)
+        ttk.Label(row3, text="Progression:", width=16).pack(side="left")
+        style_combo = ttk.Combobox(
+            row3,
+            textvariable=self.var_progression_style,
+            values=["pop", "jazz", "classical"],
+            state="readonly",
+            width=12,
+        )
+        style_combo.pack(side="left")
+        style_combo.bind("<<ComboboxSelected>>", lambda e: self._regenerate())
 
         grp_knobs = ttk.LabelFrame(left, text="Knobs (0..1 unless noted)")
         grp_knobs.pack(fill="both", expand=True)
@@ -217,6 +231,7 @@ class App(tk.Tk):
             cadence_strength=clamp01(float(self.var_cadence_strength.get())),
             humanize_timing_ms=max(0.0, float(self.var_humanize_timing_ms.get())),
             humanize_velocity=clamp01(float(self.var_humanize_velocity.get())),
+            progression_style=str(self.var_progression_style.get() or "pop"),
             seed=int(self.var_seed.get() or DEFAULT_SEED),
         )
 

@@ -6,6 +6,7 @@ import random
 from .models import BarModifiers, MelodyContourProfile, RhythmProfile, SectionDef, SongPlan
 from .utils import clamp, clamp01, lerp, pick_weighted
 from .constants import DEFAULT_SEED
+from .theory.progression import ProgressionGenerator
 
 
 def _choose_section_pattern_by_phrases(rng: random.Random, phrase_count: int) -> list[str]:
@@ -81,33 +82,15 @@ def _section_code_to_name(code: str) -> str:
     }.get(code, "verse")
 
 
-def get_pop_templates(rng: random.Random, mode: str):
+def get_pop_templates(rng: random.Random, mode: str, style_tag: str = "pop"):
     """
     Returns a list of templates, each template is a dict with:
       - name
       - degrees: list of 4 items (int 0..6 or token strings like "bVII", "iv", "V/V")
       - tags: optional tags for filtering
     """
-    templates = [
-        {"name": "I-V-vi-IV", "degrees": [0, 4, 5, 3], "tags": ["pop", "anthem"]},
-        {"name": "I-vi-IV-V", "degrees": [0, 5, 3, 4], "tags": ["pop", "classic"]},
-        {"name": "vi-IV-I-V", "degrees": [5, 3, 0, 4], "tags": ["pop", "uplift"]},
-        {"name": "IV-V-I-I", "degrees": [3, 4, 0, 0], "tags": ["pop", "simple"]},
-        {"name": "I-IV-V-IV", "degrees": [0, 3, 4, 3], "tags": ["pop", "rockish"]},
-        {"name": "ii-V-I-vi", "degrees": [1, 4, 0, 5], "tags": ["functional", "smooth"]},
-        {"name": "I-iii-IV-V", "degrees": [0, 2, 3, 4], "tags": ["pop", "forward"]},
-        {"name": "I-bVII-IV-I", "degrees": [0, "bVII", 3, 0], "tags": ["mixture", "rockish"]},
-        {"name": "I-iv-bVII-IV", "degrees": [0, "iv", "bVII", 3], "tags": ["mixture", "moody"]},
-        {"name": "vi-bVII-I-IV", "degrees": [5, "bVII", 0, 3], "tags": ["mixture", "arena"]},
-        {"name": "I-IV-V-V/V", "degrees": [0, 3, 4, "V/V"], "tags": ["functional", "lift"]},
-    ]
-
-    # If we're in natural minor, reduce the modal-mixture bias and favor functional templates.
-    if mode != "major":
-        filtered = [t for t in templates if "mixture" not in (t.get("tags") or [])]
-        return filtered if filtered else templates
-
-    return templates
+    generator = ProgressionGenerator(rng)
+    return generator.templates_for_style(style_tag, mode)
 
 
 def choose_section_templates(ctrl, rng: random.Random) -> dict:
@@ -115,7 +98,7 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
     Pick chord templates per section type. Returns:
       templates[section] = {"name": ..., "degrees": [...], "source": ...}
     """
-    all_templates = get_pop_templates(rng, ctrl.mode)
+    all_templates = get_pop_templates(rng, ctrl.mode, ctrl.progression_style)
 
     chorus_pool = []
     verse_pool = []

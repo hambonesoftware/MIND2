@@ -11,6 +11,16 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@router.get("/")
+def root():
+    logger.info("root")
+    return {
+        "message": "MIND PoC backend is running.",
+        "healthcheck": "/health",
+        "frontend": "http://localhost:5173",
+    }
+
+
 @router.get("/health")
 def health():
     logger.info("health_check")

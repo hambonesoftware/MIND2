@@ -11,6 +11,7 @@ from .utils import pc_to_name, midi_note_name, clamp, ticks_to_time_seconds, bar
 from .theory.analysis import detect_cadence, roman_numeral
 from .theory.rhythm import analyze_rhythm
 from .theory.melody_analysis import analyze_melody_events
+from .theory.counterpoint import analyze_counterpoint
 from .melody import contour_offset
 
 
@@ -158,5 +159,7 @@ def build_song_report(
 
     melody_events = part_events.get("melody", [])
     report["melody"] = analyze_melody_events(melody_events)
+    harmony_events = part_events.get("harmony", [])
+    report["counterpoint"] = analyze_counterpoint(melody_events, harmony_events)
 
     return report

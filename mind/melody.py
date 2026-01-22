@@ -49,10 +49,16 @@ def contour_offset(contour, bar_index: int, length_bars: int) -> float:
     return 0.0
 
 
-def generate_melody_track(ctrl: Controls, chord_segments: list[ChordSegment], plan: SongPlan):
+def generate_melody_track(
+    ctrl: Controls,
+    chord_segments: list[ChordSegment],
+    plan: SongPlan,
+    style: str | None = None,
+):
     rng = random.Random(ctrl.seed + 303)
     tonic_pc = key_to_pc(ctrl.key_name)
     scale = scale_pcs(tonic_pc, ctrl.mode)
+    style_key = (style or ctrl.progression_style or "pop").strip().lower()
 
     melody_base, _, _ = choose_register_base()
 
@@ -107,10 +113,16 @@ def generate_melody_track(ctrl: Controls, chord_segments: list[ChordSegment], pl
         notes_per_bar = max(2, min(12, int(round(notes_per_bar))))
 
         offbeat_prob = clamp01(lerp(0.15, 0.60, sync_eff))
+        if style_key == "jazz":
+            offbeat_prob = clamp01(offbeat_prob + 0.12)
+        elif style_key == "classical":
+            offbeat_prob = clamp01(offbeat_prob - 0.12)
 
         prefer_step_prob = clamp01(lerp(0.82, 0.50, variation_eff))
         if mod.section == "chorus":
             prefer_step_prob = clamp01(prefer_step_prob * 1.05)
+        if style_key == "classical":
+            prefer_step_prob = clamp01(prefer_step_prob + 0.12)
 
         candidates = list(range(0, 16))
         weighted = []
@@ -151,7 +163,14 @@ def generate_melody_track(ctrl: Controls, chord_segments: list[ChordSegment], pl
             scale_tones = scale_tones_in_range(scale, low, high)
 
             is_strong = (s in (0, 4, 8, 12))
+            is_offbeat = (s in (2, 6, 10, 14))
             choose_from = chord_tones if (is_strong and chord_tones) else (scale_tones if scale_tones else chord_tones)
+            if style_key == "pop" and s in (0, 8) and chord_tones:
+                choose_from = chord_tones
+            if style_key == "jazz" and is_offbeat and chord_tones:
+                choose_from = chord_tones + scale_tones
+            if style_key == "classical" and mod.is_phrase_end and chord_tones:
+                choose_from = chord_tones
             if not choose_from:
                 choose_from = [center]
 
@@ -160,13 +179,32 @@ def generate_melody_track(ctrl: Controls, chord_segments: list[ChordSegment], pl
             if last_note is None:
                 note = nearest_in_set(tgt, choose_from)
             else:
-                if rng.random() < prefer_step_prob:
-                    step_dir = 2 if (tgt >= last_note) else -2
+                chroma_prob = 0.0
+                if style_key == "jazz" and is_offbeat:
+                    chroma_prob = 0.22
+                elif style_key == "pop":
+                    chroma_prob = 0.05
+                elif style_key == "classical":
+                    chroma_prob = 0.02
+
+                if chroma_prob > 0.0 and chord_tones and rng.random() < chroma_prob:
+                    approach = rng.choice(chord_tones)
+                    direction = rng.choice([-1, 1])
+                    note = clamp(approach + direction, low, high)
+                elif rng.random() < prefer_step_prob:
+                    if style_key == "classical" and mod.is_phrase_end and chord_tones:
+                        cadence_target = nearest_in_set(tgt, chord_tones)
+                        step_dir = 2 if (cadence_target >= last_note) else -2
+                    else:
+                        step_dir = 2 if (tgt >= last_note) else -2
                     target = last_note + step_dir
                     target = int(round(lerp(target, tgt, 0.35)))
                     note = nearest_in_set(target, choose_from)
                 else:
-                    leap = rng.choice([4, 5, 7, -4, -5, -7, 9, -9])
+                    if style_key == "classical":
+                        leap = rng.choice([3, 4, -3, -4, 5, -5])
+                    else:
+                        leap = rng.choice([4, 5, 7, -4, -5, -7, 9, -9])
                     target = last_note + leap
                     target = int(round(lerp(target, tgt, 0.50)))
                     note = nearest_in_set(target, choose_from)

@@ -10,6 +10,7 @@ from .models import Controls, SongPlan, ChordSegment
 from .utils import pc_to_name, midi_note_name, clamp, ticks_to_time_seconds, bar_of_tick, step_of_tick_in_bar
 from .theory.analysis import detect_cadence, roman_numeral
 from .theory.rhythm import analyze_rhythm
+from .theory.melody_analysis import analyze_melody_events
 from .melody import contour_offset
 
 
@@ -55,6 +56,7 @@ def build_song_report(
         },
         "bars": [],
         "chords": [],
+        "melody": {},
         "layers": {},
     }
 
@@ -153,5 +155,8 @@ def build_song_report(
             )
 
         report["layers"][layer_name] = layer
+
+    melody_events = part_events.get("melody", [])
+    report["melody"] = analyze_melody_events(melody_events)
 
     return report

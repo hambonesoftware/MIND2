@@ -242,17 +242,48 @@ def build_rhythm_profile(ctrl, rng_master: random.Random) -> RhythmProfile:
 def build_melody_contour(ctrl, rng_master: random.Random) -> MelodyContourProfile:
     rng = random.Random(rng_master.randint(0, 2**31 - 1))
 
-    kinds = [
-        ("arch", 0.30),
-        ("descending", 0.18),
-        ("ascending", 0.18),
-        ("wave", 0.24),
-        ("plateau", 0.10),
-    ]
+    style_key = (ctrl.progression_style or "pop").strip().lower()
+    if style_key == "pop":
+        kinds = [
+            ("arch", 0.34),
+            ("descending", 0.20),
+            ("ascending", 0.20),
+            ("wave", 0.16),
+            ("plateau", 0.10),
+        ]
+        intensity_bounds = (0.30, 0.80)
+    elif style_key == "jazz":
+        kinds = [
+            ("arch", 0.26),
+            ("descending", 0.16),
+            ("ascending", 0.16),
+            ("wave", 0.32),
+            ("plateau", 0.10),
+        ]
+        intensity_bounds = (0.45, 1.05)
+    elif style_key == "classical":
+        kinds = [
+            ("arch", 0.45),
+            ("descending", 0.20),
+            ("ascending", 0.20),
+            ("wave", 0.10),
+            ("plateau", 0.05),
+        ]
+        intensity_bounds = (0.35, 0.90)
+    else:
+        kinds = [
+            ("arch", 0.30),
+            ("descending", 0.18),
+            ("ascending", 0.18),
+            ("wave", 0.24),
+            ("plateau", 0.10),
+        ]
+        intensity_bounds = (0.35, 1.00)
     kind = pick_weighted(rng, kinds)
 
-    intensity = clamp01(lerp(0.35, 1.00, (ctrl.variation * 0.6 + ctrl.energy * 0.4)))
-    intensity = clamp01(intensity * lerp(0.85, 1.10, rng.random()))
+    base = (ctrl.variation * 0.6 + ctrl.energy * 0.4)
+    intensity = clamp01(lerp(intensity_bounds[0], intensity_bounds[1], base))
+    intensity = clamp01(intensity * lerp(0.88, 1.08, rng.random()))
 
     return MelodyContourProfile(kind=kind, intensity=intensity)
 

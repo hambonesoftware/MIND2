@@ -83,6 +83,12 @@ def generate_melody_track(
         mod, density_eff, energy_eff, sync_eff, variation_eff, repetition_eff = bar_density_energy_sync(bar_index)
 
         motif_reuse_prob = clamp01(repetition_eff)
+        if style_key == "pop":
+            motif_reuse_prob = clamp01(motif_reuse_prob * 1.20 + 0.05)
+        elif style_key == "jazz":
+            motif_reuse_prob = clamp01(motif_reuse_prob * 0.70)
+        elif style_key == "classical":
+            motif_reuse_prob = clamp01(motif_reuse_prob * 0.95 + 0.02)
         if mod.section == "chorus":
             motif_reuse_prob = clamp01(motif_reuse_prob * 0.85 + 0.05)
 

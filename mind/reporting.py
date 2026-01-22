@@ -9,6 +9,7 @@ from .constants import DRUM_CHANNEL, PPQ
 from .models import Controls, SongPlan, ChordSegment
 from .utils import pc_to_name, midi_note_name, clamp, ticks_to_time_seconds, bar_of_tick, step_of_tick_in_bar
 from .theory.analysis import detect_cadence, roman_numeral
+from .theory.engine import analyze as analyze_plugins, registered as registered_plugins
 from .theory.rhythm import analyze_rhythm
 from .theory.melody_analysis import analyze_melody_events
 from .theory.counterpoint import analyze_counterpoint
@@ -35,6 +36,7 @@ def build_song_report(
     plan: SongPlan,
     chord_segments: list[ChordSegment],
     part_events: dict[str, list[tuple[int, Message]]],
+    run_plugins: bool = True,
 ):
     """Build a JSON-serializable report for later analysis."""
     report: dict[str, Any] = {
@@ -161,5 +163,15 @@ def build_song_report(
     report["melody"] = analyze_melody_events(melody_events)
     harmony_events = part_events.get("harmony", [])
     report["counterpoint"] = analyze_counterpoint(melody_events, harmony_events)
+
+    if run_plugins and registered_plugins():
+        plugin_data = {
+            "controls": ctrl,
+            "plan": plan,
+            "chord_segments": chord_segments,
+            "part_events": part_events,
+            "report": report,
+        }
+        report["plugins"] = analyze_plugins(plugin_data)
 
     return report

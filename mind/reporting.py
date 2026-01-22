@@ -9,6 +9,7 @@ from .constants import DRUM_CHANNEL, PPQ
 from .models import Controls, SongPlan, ChordSegment
 from .utils import pc_to_name, midi_note_name, clamp, ticks_to_time_seconds, bar_of_tick, step_of_tick_in_bar
 from .theory.analysis import detect_cadence, roman_numeral
+from .theory.rhythm import analyze_rhythm
 from .melody import contour_offset
 
 
@@ -122,6 +123,7 @@ def build_song_report(
             "pitch_range": [min(pitches), max(pitches)] if pitches else None,
             "avg_pitch": (sum(pitches) / len(pitches)) if pitches else None,
             "avg_velocity": (sum(velocities) / len(velocities)) if velocities else None,
+            "rhythm": analyze_rhythm([t for t, _ in ons], ctrl.length_bars),
             "notes_per_bar": {},
             "steps_histogram": {},
             "preview": [],

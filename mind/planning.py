@@ -5,7 +5,7 @@ import random
 
 from .models import BarModifiers, MelodyContourProfile, RhythmProfile, SectionDef, SongPlan
 from .utils import clamp, clamp01, lerp, pick_weighted
-from .constants import DEFAULT_SEED
+from .constants import DEFAULT_SEED, STYLE_RHYTHM_ARCHETYPES, STYLE_SWING_DEFAULTS
 from .theory.progression import ProgressionGenerator
 
 
@@ -186,12 +186,21 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
 def build_rhythm_profile(ctrl, rng_master: random.Random) -> RhythmProfile:
     rng = random.Random(rng_master.randint(0, 2**31 - 1))
 
-    archetypes = [
-        ("straight_pop", 0.40),
-        ("four_on_floor", 0.25),
-        ("half_time", 0.18),
-        ("bouncy", 0.17),
-    ]
+    style_key = (ctrl.progression_style or "").lower()
+    if ctrl.swing <= 0.01:
+        swing_range = STYLE_SWING_DEFAULTS.get(style_key)
+        if swing_range:
+            ctrl.swing = clamp01(rng.uniform(*swing_range))
+
+    archetypes = STYLE_RHYTHM_ARCHETYPES.get(
+        style_key,
+        [
+            ("straight_pop", 0.40),
+            ("four_on_floor", 0.25),
+            ("half_time", 0.18),
+            ("bouncy", 0.17),
+        ],
+    )
     archetype = pick_weighted(rng, archetypes)
 
     base_hat_steps = [0, 2, 4, 6, 8, 10, 12, 14]

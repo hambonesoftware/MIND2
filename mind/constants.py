@@ -25,3 +25,26 @@ GM_PIANO = 0
 GM_EPIANO = 4
 GM_GUITAR = 24
 GM_BASS = 32
+
+STYLE_RHYTHM_ARCHETYPES = {
+    "pop": [
+        ("straight_pop", 0.55),
+        ("four_on_floor", 0.35),
+        ("half_time", 0.10),
+    ],
+    "jazz": [
+        ("bouncy", 0.70),
+        ("straight_pop", 0.20),
+        ("half_time", 0.10),
+    ],
+    "classical": [
+        ("straight_pop", 0.55),
+        ("half_time", 0.45),
+    ],
+}
+
+STYLE_SWING_DEFAULTS = {
+    "pop": (0.05, 0.15),
+    "jazz": (0.55, 0.65),
+    "classical": (0.0, 0.10),
+}

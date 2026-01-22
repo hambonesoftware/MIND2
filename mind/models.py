@@ -25,6 +25,8 @@ class Controls:
     humanize_timing_ms: float
     humanize_velocity: float
 
+    progression_style: str
+
     seed: int
 
 

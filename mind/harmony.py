@@ -10,6 +10,7 @@ from .constants import GM_PIANO, HARMONY_CH
 from .models import ChordSegment, Controls, SongPlan
 from .theory.chords import ChordSpec, harmonic_function, guess_inversion
 from .planning import build_song_plan
+from .theory.voice_leading import initial_voicing, smooth_voice_leading
 from .utils import (
     bar_step_to_abs_tick,
     chord_tones_in_range,
@@ -495,95 +496,11 @@ def segment_for_step(segments_in_bar: list[ChordSegment], step: int):
 
 
 def _initial_harmony_voicing(rng: random.Random, chord_pcs: list[int], low: int, high: int, center: int, voice_count: int):
-    chord_notes = chord_tones_in_range(chord_pcs, low, high)
-    if not chord_notes:
-        return []
-
-    chord_notes_sorted = sorted(set(chord_notes))
-    first = nearest_in_set(center, chord_notes_sorted)
-
-    voicing = [first]
-    idx = chord_notes_sorted.index(first) if first in chord_notes_sorted else 0
-
-    while len(voicing) < voice_count:
-        step = pick_weighted(rng, [(2, 0.45), (4, 0.35), (6, 0.15), (7, 0.05)])
-        ni = idx + step
-        if ni >= len(chord_notes_sorted):
-            ni = len(chord_notes_sorted) - 1
-        cand = chord_notes_sorted[ni]
-        if cand not in voicing:
-            voicing.append(cand)
-        else:
-            ni2 = min(len(chord_notes_sorted) - 1, ni + 1)
-            cand2 = chord_notes_sorted[ni2]
-            if cand2 not in voicing:
-                voicing.append(cand2)
-            else:
-                break
-
-    return sorted(voicing)
+    return initial_voicing(rng, chord_pcs, low, high, center, voice_count)
 
 
 def _voice_lead(prev_voicing: list[int], chord_pcs: list[int], low: int, high: int):
-    """Advanced (parsimonious) voice-leading.
-
-    Priorities:
-      1) Keep common tones if possible
-      2) Otherwise move by the smallest distance to a chord tone
-      3) Maintain strictly ascending voices (no crossings)
-      4) Avoid exact duplicates by bumping upper voices when possible
-    """
-    if not prev_voicing:
-        return []
-
-    target_notes = chord_tones_in_range(chord_pcs, low, high)
-    if not target_notes:
-        return prev_voicing[:]
-
-    target_notes_sorted = sorted(set(target_notes))
-
-    new_voicing: list[int] = []
-    last_assigned = low - 1
-
-    for v in sorted(prev_voicing):
-        # 1) Common-tone preservation
-        if (v % 12) in chord_pcs and low <= v <= high:
-            chosen = v
-        else:
-            # 2) Minimum-distance move
-            chosen = nearest_in_set(v, target_notes_sorted)
-
-        # 3) Keep voices ordered (no crossings)
-        if chosen <= last_assigned:
-            higher = [n for n in target_notes_sorted if n > last_assigned]
-            if higher:
-                chosen = nearest_in_set(v, higher)
-            else:
-                chosen = min(high, last_assigned + 1)
-
-        new_voicing.append(chosen)
-        last_assigned = chosen
-
-    # 4) De-duplicate: if two voices land on the same note, bump upper voices
-    fixed: list[int] = []
-    used = set()
-    last = low - 1
-    for n in new_voicing:
-        cand = max(n, last + 1)
-        # If duplicate, try pushing up by octaves first
-        while cand in used and (cand + 12) <= high:
-            cand += 12
-        # Still duplicate (or out of range) -> nudge to the next available tone
-        if cand in used:
-            higher = [x for x in target_notes_sorted if x > last]
-            if higher:
-                cand = higher[0]
-        cand = min(high, max(low, cand))
-        fixed.append(cand)
-        used.add(cand)
-        last = cand
-
-    return fixed
+    return smooth_voice_leading(prev_voicing, chord_pcs, low, high)
 
 
 def generate_harmony_track(ctrl: Controls, chord_segments: list[ChordSegment], plan: SongPlan):

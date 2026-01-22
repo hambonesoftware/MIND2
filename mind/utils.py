@@ -4,6 +4,7 @@ import random
 from typing import Iterable
 
 from .constants import NOTE_NAMES, NAME_TO_PC, PPQ
+from .theory.scales import get_scale
 
 
 def clamp01(x: float) -> float:
@@ -44,12 +45,8 @@ def key_to_pc(key_name: str) -> int:
 
 
 def scale_pcs(tonic_pc: int, mode: str):
-    # Major scale intervals
-    major = [0, 2, 4, 5, 7, 9, 11]
-    # Natural minor intervals
-    natural_minor = [0, 2, 3, 5, 7, 8, 10]
-    steps = major if mode == "major" else natural_minor
-    return [(tonic_pc + x) % 12 for x in steps]
+    scale = get_scale(mode)
+    return [(tonic_pc + x) % 12 for x in scale.intervals]
 
 
 def degree_to_pc(tonic_pc: int, mode: str, degree_index_0_based: int) -> int:
@@ -60,10 +57,13 @@ def degree_to_pc(tonic_pc: int, mode: str, degree_index_0_based: int) -> int:
 def diatonic_triad_quality(mode: str, degree_index_0_based: int):
     # In major: I maj, ii min, iii min, IV maj, V maj, vi min, vii dim
     # In natural minor: i min, ii dim, III maj, iv min, v min, VI maj, VII maj
-    if mode == "major":
-        qualities = ["maj", "min", "min", "maj", "maj", "min", "dim"]
+    scale = get_scale(mode)
+    if scale.diatonic_chord_qualities:
+        qualities = scale.diatonic_chord_qualities
+    elif mode == "major":
+        qualities = ("maj", "min", "min", "maj", "maj", "min", "dim")
     else:
-        qualities = ["min", "dim", "maj", "min", "min", "maj", "maj"]
+        qualities = ("min", "dim", "maj", "min", "min", "maj", "maj")
     return qualities[degree_index_0_based % 7]
 
 

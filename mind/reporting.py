@@ -8,6 +8,7 @@ from mido import Message
 from .constants import DRUM_CHANNEL, PPQ
 from .models import Controls, SongPlan, ChordSegment
 from .utils import pc_to_name, midi_note_name, clamp, ticks_to_time_seconds, bar_of_tick, step_of_tick_in_bar
+from .theory.analysis import detect_cadence, roman_numeral
 from .melody import contour_offset
 
 
@@ -56,8 +57,14 @@ def build_song_report(
         "layers": {},
     }
 
+    key_context = {"key_name": ctrl.key_name, "mode": ctrl.mode}
     for b in range(ctrl.length_bars):
         mod = plan.bar_mods[b]
+        cadence_type = None
+        if mod.is_phrase_end:
+            phrase_start = max(0, b - plan.phrase_len_bars + 1)
+            phrase_chords = [seg for seg in chord_segments if phrase_start <= seg.bar_index <= b]
+            cadence_type = detect_cadence(phrase_chords, key_context)
         report["bars"].append(
             {
                 "bar_index": b,
@@ -65,6 +72,7 @@ def build_song_report(
                 "is_phrase_end": mod.is_phrase_end,
                 "is_section_start": mod.is_section_start,
                 "is_section_end": mod.is_section_end,
+                "cadence": cadence_type,
                 "multipliers": {
                     "density_mul": mod.density_mul,
                     "energy_mul": mod.energy_mul,
@@ -79,6 +87,7 @@ def build_song_report(
         )
 
     for seg in chord_segments:
+        numeral = roman_numeral(seg, key_context)
         report["chords"].append(
             {
                 "bar_index": seg.bar_index,
@@ -86,6 +95,7 @@ def build_song_report(
                 "end_step": seg.end_step,
                 "section": seg.section,
                 "label": seg.label,
+                "roman_numeral": numeral,
                 "root_pc": seg.root_pc,
                 "root_name": pc_to_name(seg.root_pc),
                 "quality": seg.quality,

@@ -5,7 +5,7 @@ from typing import Any
 
 from mido import Message
 
-from .constants import DRUM_CHANNEL, PPQ
+from .constants import DRUM_CHANNEL, PPQ, STYLE_RHYTHM_ARCHETYPES
 from .models import Controls, SongPlan, ChordSegment
 from .utils import pc_to_name, midi_note_name, clamp, ticks_to_time_seconds, bar_of_tick, step_of_tick_in_bar
 from .theory.analysis import detect_cadence, roman_numeral
@@ -39,9 +39,16 @@ def build_song_report(
     run_plugins: bool = True,
 ):
     """Build a JSON-serializable report for later analysis."""
+    style_key = (ctrl.progression_style or "pop").strip().lower()
     report: dict[str, Any] = {
         "report_version": "pop_knob_player_v2",
         "controls": asdict(ctrl),
+        "style_profile": {
+            "style": style_key,
+            "rhythm_archetype": plan.rhythm.archetype,
+            "swing_amount": ctrl.swing,
+            "style_rules_applied": style_key in STYLE_RHYTHM_ARCHETYPES,
+        },
         "profiles": {
             "section_pattern": [{"name": s.name, "bar_start": s.bar_start, "bar_end_excl": s.bar_end_excl} for s in plan.sections],
             "phrase_len_bars": plan.phrase_len_bars,

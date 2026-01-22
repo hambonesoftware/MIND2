@@ -23,9 +23,31 @@ from .utils import (
 )
 
 
-def _choose_bass_cell(rng: random.Random, archetype: str):
+def _choose_bass_cell(rng: random.Random, archetype: str, style: str | None):
     patterns = []
-    if archetype == "four_on_floor":
+    style_key = (style or "").strip().lower()
+    if style_key == "jazz":
+        patterns = [
+            ([0, 2, 4, 6, 8, 10, 12, 14], 0.40),
+            ([0, 2, 4, 8, 10, 12, 14], 0.25),
+            ([0, 2, 6, 8, 10, 12, 14], 0.20),
+            ([0, 4, 6, 8, 10, 12, 14], 0.15),
+        ]
+    elif style_key == "pop":
+        patterns = [
+            ([0, 4, 8, 12], 0.35),
+            ([0, 6, 8, 14], 0.25),
+            ([0, 3, 8, 11, 14], 0.20),
+            ([0, 2, 8, 10, 14], 0.20),
+        ]
+    elif style_key == "classical":
+        patterns = [
+            ([0, 4, 8, 12], 0.40),
+            ([0, 2, 4, 6, 8, 10, 12, 14], 0.25),
+            ([0, 4, 6, 8, 10, 12], 0.20),
+            ([0, 2, 6, 8, 12, 14], 0.15),
+        ]
+    elif archetype == "four_on_floor":
         patterns = [
             ([0, 4, 8, 12], 0.35),
             ([0, 6, 8, 14], 0.25),
@@ -71,7 +93,7 @@ def generate_bass_track(ctrl: Controls, chord_segments: list[ChordSegment], plan
 
     base_vel_global = int(round(lerp(62, 98, ctrl.energy)))
 
-    bass_cell = _choose_bass_cell(rng, plan.rhythm.archetype)
+    bass_cell = _choose_bass_cell(rng, plan.rhythm.archetype, ctrl.progression_style)
 
     anticipate_prob_base = clamp01(lerp(0.05, 0.35, ctrl.syncopation))
     approach_prob_base = clamp01(lerp(0.03, 0.16, ctrl.chord_complexity))

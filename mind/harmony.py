@@ -8,6 +8,7 @@ from mido import Message
 
 from .constants import GM_PIANO, HARMONY_CH
 from .models import ChordSegment, Controls, SongPlan
+from .theory.chords import ChordSpec, harmonic_function, guess_inversion
 from .planning import build_song_plan
 from .utils import (
     bar_step_to_abs_tick,
@@ -300,6 +301,15 @@ def make_chord_segment(
 
     extension = _choose_extension(ctrl_tmp, rng, section, label, quality)
     pcs = _build_pcs_with_extension(root_pc, quality, extension, rng, ctrl.mode, label)
+    inversion = guess_inversion(pcs, root_pc)
+    function = harmonic_function(label, quality)
+    chord_spec = ChordSpec(
+        root_pc=root_pc,
+        quality=quality,
+        extension=extension,
+        inversion=inversion,
+        function=function,
+    )
 
     return ChordSegment(
         bar_index=bar,
@@ -313,6 +323,7 @@ def make_chord_segment(
         is_borrowed=is_borrowed,
         section=section,
         template_tag=template_tag,
+        chord=chord_spec,
     )
 
 

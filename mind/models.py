@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .theory.chords import ChordSpec
+
 
 @dataclass
 class Controls:
@@ -88,3 +90,4 @@ class ChordSegment:
     is_borrowed: bool
     section: str
     template_tag: str
+    chord: ChordSpec

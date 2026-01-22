@@ -1,0 +1,143 @@
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+from mido import Message
+
+from .constants import DRUM_CHANNEL, PPQ
+from .models import Controls, SongPlan, ChordSegment
+from .utils import pc_to_name, midi_note_name, clamp, ticks_to_time_seconds, bar_of_tick, step_of_tick_in_bar
+from .melody import contour_offset
+
+
+def _extract_note_ons(events: list[tuple[int, Message]], channel: int | None = None, drum: bool = False):
+    note_ons = []
+    for abs_tick, msg in events:
+        if msg.type != "note_on":
+            continue
+        if msg.velocity is None or msg.velocity <= 0:
+            continue
+        if channel is not None and getattr(msg, "channel", None) != channel:
+            continue
+        if drum and getattr(msg, "channel", None) != DRUM_CHANNEL:
+            continue
+        note_ons.append((abs_tick, msg))
+    return note_ons
+
+
+def build_song_report(
+    ctrl: Controls,
+    plan: SongPlan,
+    chord_segments: list[ChordSegment],
+    part_events: dict[str, list[tuple[int, Message]]],
+):
+    """Build a JSON-serializable report for later analysis."""
+    report: dict[str, Any] = {
+        "report_version": "pop_knob_player_v2",
+        "controls": asdict(ctrl),
+        "profiles": {
+            "section_pattern": [{"name": s.name, "bar_start": s.bar_start, "bar_end_excl": s.bar_end_excl} for s in plan.sections],
+            "phrase_len_bars": plan.phrase_len_bars,
+            "rhythm_profile": {
+                "archetype": plan.rhythm.archetype,
+                "base_kick_steps": plan.rhythm.base_kick_steps,
+                "base_snare_steps": plan.rhythm.base_snare_steps,
+                "base_hat_steps": plan.rhythm.base_hat_steps,
+                "hat_16th_bias": plan.rhythm.hat_16th_bias,
+                "kick_sync_bias": plan.rhythm.kick_sync_bias,
+                "fill_style": plan.rhythm.fill_style,
+            },
+            "melody_contour": {"kind": plan.contour.kind, "intensity": plan.contour.intensity},
+            "section_templates": plan.templates,
+        },
+        "bars": [],
+        "chords": [],
+        "layers": {},
+    }
+
+    for b in range(ctrl.length_bars):
+        mod = plan.bar_mods[b]
+        report["bars"].append(
+            {
+                "bar_index": b,
+                "section": mod.section,
+                "is_phrase_end": mod.is_phrase_end,
+                "is_section_start": mod.is_section_start,
+                "is_section_end": mod.is_section_end,
+                "multipliers": {
+                    "density_mul": mod.density_mul,
+                    "energy_mul": mod.energy_mul,
+                    "sync_mul": mod.sync_mul,
+                    "chord_comp_mul": mod.chord_comp_mul,
+                    "variation_mul": mod.variation_mul,
+                    "repetition_mul": mod.repetition_mul,
+                    "melody_shift_semitones": mod.melody_shift_semitones,
+                },
+                "contour_offset_semitones": contour_offset(plan.contour, b, ctrl.length_bars),
+            }
+        )
+
+    for seg in chord_segments:
+        report["chords"].append(
+            {
+                "bar_index": seg.bar_index,
+                "start_step": seg.start_step,
+                "end_step": seg.end_step,
+                "section": seg.section,
+                "label": seg.label,
+                "root_pc": seg.root_pc,
+                "root_name": pc_to_name(seg.root_pc),
+                "quality": seg.quality,
+                "extension": seg.extension,
+                "pcs": seg.pcs,
+                "pc_names": [pc_to_name(p) for p in seg.pcs],
+                "is_borrowed": seg.is_borrowed,
+                "template_tag": seg.template_tag,
+            }
+        )
+
+    for layer_name, events in part_events.items():
+        ons = _extract_note_ons(events, drum=(layer_name == "drums"))
+        pitches = [m.note for _, m in ons]
+        velocities = [m.velocity for _, m in ons]
+        bars = [bar_of_tick(t) for t, _ in ons]
+        steps = [step_of_tick_in_bar(t) for t, _ in ons]
+
+        layer: dict[str, Any] = {
+            "note_on_count": len(ons),
+            "unique_pitches": sorted(set(pitches)),
+            "pitch_range": [min(pitches), max(pitches)] if pitches else None,
+            "avg_pitch": (sum(pitches) / len(pitches)) if pitches else None,
+            "avg_velocity": (sum(velocities) / len(velocities)) if velocities else None,
+            "notes_per_bar": {},
+            "steps_histogram": {},
+            "preview": [],
+        }
+
+        counts = {}
+        for b in bars:
+            counts[b] = counts.get(b, 0) + 1
+        layer["notes_per_bar"] = {str(k): v for k, v in sorted(counts.items(), key=lambda x: x[0])}
+
+        sh = {}
+        for s in steps:
+            s = int(clamp(s, 0, 15))
+            sh[s] = sh.get(s, 0) + 1
+        layer["steps_histogram"] = {str(k): v for k, v in sorted(sh.items(), key=lambda x: x[0])}
+
+        for abs_tick, msg in ons[:60]:
+            layer["preview"].append(
+                {
+                    "time_sec": round(ticks_to_time_seconds(abs_tick, ctrl.bpm), 4),
+                    "bar": bar_of_tick(abs_tick),
+                    "step": step_of_tick_in_bar(abs_tick),
+                    "note": int(msg.note),
+                    "note_name": midi_note_name(int(msg.note)) if layer_name != "drums" else int(msg.note),
+                    "velocity": int(msg.velocity),
+                }
+            )
+
+        report["layers"][layer_name] = layer
+
+    return report

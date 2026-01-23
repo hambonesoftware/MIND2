@@ -41,10 +41,16 @@ STYLE_RHYTHM_ARCHETYPES = {
         ("straight_pop", 0.55),
         ("half_time", 0.45),
     ],
+    "rock": [
+        ("straight_pop", 0.55),
+        ("four_on_floor", 0.30),
+        ("half_time", 0.15),
+    ],
 }
 
 STYLE_SWING_DEFAULTS = {
     "pop": (0.05, 0.15),
     "jazz": (0.55, 0.65),
     "classical": (0.0, 0.10),
+    "rock": (0.0, 0.08),
 }

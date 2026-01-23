@@ -67,6 +67,26 @@ STYLE_PROFILES: dict[str, StyleProfile] = {
             ("drop", 0.30),
         ),
     ),
+    "rock": StyleProfile(
+        density_range=(0.42, 0.78),
+        syncopation_range=(0.18, 0.50),
+        swing_range=(0.00, 0.10),
+        chord_complexity_range=(0.20, 0.55),
+        repetition_range=(0.55, 0.85),
+        variation_range=(0.25, 0.55),
+        energy_range=(0.50, 0.88),
+        cadence_strength_range=(0.50, 0.85),
+        groove_archetypes=(
+            ("straight_pop", 0.55),
+            ("four_on_floor", 0.30),
+            ("bouncy", 0.15),
+        ),
+        lift_profiles=(
+            ("lift", 0.45),
+            ("plateau", 0.35),
+            ("drop", 0.20),
+        ),
+    ),
 }
 
 

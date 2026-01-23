@@ -5,7 +5,7 @@ from typing import Any
 
 from mido import Message
 
-from .constants import DRUM_CHANNEL, PPQ, STYLE_RHYTHM_ARCHETYPES
+from .constants import DRUM_CHANNEL, PPQ, STYLE_RHYTHM_ARCHETYPES, LEVEL2_KNOB_METADATA, level2_knob_label
 from .models import Controls, SongPlan, ChordSegment
 from .control_mapping import map_controls
 from .utils import pc_to_name, midi_note_name, clamp, ticks_to_time_seconds, bar_of_tick, step_of_tick_in_bar
@@ -53,6 +53,14 @@ def build_song_report(
         base_value = getattr(base_derived.level2, field)
         if _value_changed(value, base_value):
             level2_overrides[field] = {"base": base_value, "value": value}
+    level2_display: dict[str, dict[str, Any]] = {}
+    for knob_key, meta in LEVEL2_KNOB_METADATA.items():
+        level2_display[knob_key] = {
+            "label": level2_knob_label(knob_key, style_key),
+            "value": getattr(ctrl.derived.level2, knob_key, None),
+            "range": meta.get("range"),
+            "tooltip": meta.get("tooltip"),
+        }
     humanize_overrides = {}
     if _value_changed(ctrl.derived.humanize_timing_ms, base_derived.humanize_timing_ms):
         humanize_overrides["timing_ms"] = {
@@ -76,6 +84,7 @@ def build_song_report(
         },
         "derived_parameters": {
             "level2": asdict(ctrl.derived.level2),
+            "level2_display": level2_display,
             "engine": {
                 "density": ctrl.derived.density,
                 "syncopation": ctrl.derived.syncopation,

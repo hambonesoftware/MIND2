@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import random
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from .constants import NOTE_NAMES, NAME_TO_PC, PPQ
 from .theory.scales import get_scale
-from .models import Level2Knobs
+
+if TYPE_CHECKING:
+    from .models import Level2Knobs
 
 
 def clamp01(x: float) -> float:

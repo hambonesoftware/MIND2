@@ -10,12 +10,12 @@ from mido import Message, MidiFile
 
 from .constants import DEFAULT_SEED, NOTE_NAMES
 from .control_mapping import map_controls
-from .models import Controls, StyleMoodControls
+from .models import Controls, Level2Knobs, StyleMoodControls
 from .midi_build import build_midifile, build_song_bundle
 from .planning import build_song_plan
 from .harmony import build_chord_segments
 from .player import MidiPlayer
-from .utils import clamp01, key_to_pc, scale_pcs, pc_to_name
+from .utils import clamp01, key_to_pc, lerp, scale_pcs, pc_to_name
 from .utils import midi_note_name
 
 
@@ -29,6 +29,12 @@ def _fmt(x):
 
 
 class App(tk.Tk):
+    STYLE_LABELS = {
+        "Modern Pop": "pop",
+        "Early Rock & Roll": "rock",
+        "Jazz": "jazz",
+    }
+
     def __init__(self):
         super().__init__()
         self.title("Pop Knob Player (Chords-First) - Tkinter + Mido")
@@ -41,16 +47,29 @@ class App(tk.Tk):
         self.var_bpm = tk.IntVar(value=120)
         self.var_key = tk.StringVar(value="C")
         self.var_mode = tk.StringVar(value="major")
-        self.var_progression_style = tk.StringVar(value="pop")
 
-        self.var_density = tk.DoubleVar(value=0.55)
-        self.var_syncopation = tk.DoubleVar(value=0.30)
-        self.var_swing = tk.DoubleVar(value=0.06)
-        self.var_chord_complexity = tk.DoubleVar(value=0.35)
-        self.var_repetition = tk.DoubleVar(value=0.70)
-        self.var_variation = tk.DoubleVar(value=0.35)
-        self.var_energy = tk.DoubleVar(value=0.60)
-        self.var_cadence_strength = tk.DoubleVar(value=0.70)
+        self.var_style = tk.StringVar(value="Modern Pop")
+        self.var_mood_brightness = tk.DoubleVar(value=0.65)
+        self.var_mood_energy = tk.DoubleVar(value=0.55)
+        self.var_mood_tension = tk.DoubleVar(value=0.40)
+        self.var_intensity = tk.DoubleVar(value=0.60)
+        self.var_complexity = tk.DoubleVar(value=0.35)
+        self.var_tightness = tk.DoubleVar(value=0.65)
+
+        self.var_show_advanced = tk.BooleanVar(value=False)
+        self.var_override_level2 = tk.BooleanVar(value=False)
+        self.var_level2_functional_clarity = tk.DoubleVar(value=0.70)
+        self.var_level2_chromaticism = tk.DoubleVar(value=0.35)
+        self.var_level2_extension_richness = tk.DoubleVar(value=0.40)
+        self.var_level2_turnaround_intensity = tk.DoubleVar(value=0.55)
+        self.var_level2_swing_amount = tk.DoubleVar(value=0.12)
+        self.var_level2_syncopation = tk.DoubleVar(value=0.35)
+        self.var_level2_chord_tone_anchoring = tk.DoubleVar(value=0.70)
+        self.var_level2_melodic_range = tk.DoubleVar(value=0.55)
+        self.var_level2_motif_repetition = tk.DoubleVar(value=0.60)
+        self.var_level2_form_strictness = tk.DoubleVar(value=0.55)
+        self.var_level2_groove = tk.StringVar(value="")
+        self.var_level2_lift = tk.StringVar(value="")
 
         self.var_humanize_timing_ms = tk.DoubleVar(value=8.0)
         self.var_humanize_velocity = tk.DoubleVar(value=0.10)
@@ -66,6 +85,8 @@ class App(tk.Tk):
         self._cached_chords = None
         self._cached_part_events = None
         self._cached_report = None
+        self._level2_groove_combo: ttk.Combobox | None = None
+        self._level2_lift_combo: ttk.Combobox | None = None
 
         self._build_ui()
         self._refresh_outputs()
@@ -123,33 +144,174 @@ class App(tk.Tk):
         mode_combo.pack(side="left")
         mode_combo.bind("<<ComboboxSelected>>", lambda e: self._regenerate())
 
-        row3 = ttk.Frame(grp_basic)
-        row3.pack(fill="x", pady=4)
-        ttk.Label(row3, text="Progression:", width=16).pack(side="left")
+        grp_style = ttk.LabelFrame(left, text="Style + Mood (Level 1)")
+        grp_style.pack(fill="x", pady=(0, 10))
+
+        style_row = ttk.Frame(grp_style)
+        style_row.pack(fill="x", pady=4)
+        ttk.Label(style_row, text="Style:", width=16).pack(side="left")
         style_combo = ttk.Combobox(
-            row3,
-            textvariable=self.var_progression_style,
-            values=["pop", "jazz", "classical"],
+            style_row,
+            textvariable=self.var_style,
+            values=list(self.STYLE_LABELS.keys()),
             state="readonly",
-            width=12,
+            width=18,
         )
         style_combo.pack(side="left")
         style_combo.bind("<<ComboboxSelected>>", lambda e: self._regenerate())
 
-        grp_knobs = ttk.LabelFrame(left, text="Knobs (0..1 unless noted)")
-        grp_knobs.pack(fill="both", expand=True)
+        self._add_slider(grp_style, "Bright ↔ Dark", self.var_mood_brightness, 0.0, 1.0, self._regenerate)
+        self._add_slider(grp_style, "Calm ↔ Energetic", self.var_mood_energy, 0.0, 1.0, self._regenerate)
+        self._add_slider(grp_style, "Tense ↔ Relaxed", self.var_mood_tension, 0.0, 1.0, self._regenerate)
+        self._add_slider(grp_style, "Intensity", self.var_intensity, 0.0, 1.0, self._regenerate)
+        self._add_slider(grp_style, "Complexity", self.var_complexity, 0.0, 1.0, self._regenerate)
+        self._add_slider(grp_style, "Tightness", self.var_tightness, 0.0, 1.0, self._regenerate)
 
-        self._add_slider(grp_knobs, "Density", self.var_density, 0.0, 1.0, self._regenerate)
-        self._add_slider(grp_knobs, "Syncopation", self.var_syncopation, 0.0, 1.0, self._regenerate)
-        self._add_slider(grp_knobs, "Swing", self.var_swing, 0.0, 1.0, self._regenerate)
-        self._add_slider(grp_knobs, "Chord Complexity", self.var_chord_complexity, 0.0, 1.0, self._regenerate)
-        self._add_slider(grp_knobs, "Repetition", self.var_repetition, 0.0, 1.0, self._regenerate)
-        self._add_slider(grp_knobs, "Variation", self.var_variation, 0.0, 1.0, self._regenerate)
-        self._add_slider(grp_knobs, "Energy", self.var_energy, 0.0, 1.0, self._regenerate)
-        self._add_slider(grp_knobs, "Cadence Strength", self.var_cadence_strength, 0.0, 1.0, self._regenerate)
+        grp_performance = ttk.LabelFrame(left, text="Performance")
+        grp_performance.pack(fill="x", pady=(0, 10))
+        self._add_slider(
+            grp_performance,
+            "Humanize Timing (ms)",
+            self.var_humanize_timing_ms,
+            0.0,
+            25.0,
+            self._regenerate,
+            resolution=0.5,
+        )
+        self._add_slider(
+            grp_performance,
+            "Humanize Velocity",
+            self.var_humanize_velocity,
+            0.0,
+            0.35,
+            self._regenerate,
+            resolution=0.01,
+        )
 
-        self._add_slider(grp_knobs, "Humanize Timing (ms)", self.var_humanize_timing_ms, 0.0, 25.0, self._regenerate, resolution=0.5)
-        self._add_slider(grp_knobs, "Humanize Velocity", self.var_humanize_velocity, 0.0, 0.35, self._regenerate, resolution=0.01)
+        adv_toggle_row = ttk.Frame(left)
+        adv_toggle_row.pack(fill="x", pady=(0, 4))
+        ttk.Checkbutton(
+            adv_toggle_row,
+            text="Show Advanced Level 2",
+            variable=self.var_show_advanced,
+            command=self._toggle_advanced,
+        ).pack(side="left")
+
+        self.grp_advanced = ttk.LabelFrame(left, text="Advanced: Level 2 Overrides")
+        if self.var_show_advanced.get():
+            self.grp_advanced.pack(fill="x")
+        override_row = ttk.Frame(self.grp_advanced)
+        override_row.pack(fill="x", pady=4)
+        ttk.Checkbutton(
+            override_row,
+            text="Override derived Level 2 values",
+            variable=self.var_override_level2,
+            command=self._regenerate,
+        ).pack(side="left")
+
+        self._add_slider(
+            self.grp_advanced,
+            "Functional Clarity",
+            self.var_level2_functional_clarity,
+            0.0,
+            1.0,
+            self._regenerate,
+        )
+        self._add_slider(
+            self.grp_advanced,
+            "Chromaticism",
+            self.var_level2_chromaticism,
+            0.0,
+            1.0,
+            self._regenerate,
+        )
+        self._add_slider(
+            self.grp_advanced,
+            "Extension Richness",
+            self.var_level2_extension_richness,
+            0.0,
+            1.0,
+            self._regenerate,
+        )
+        self._add_slider(
+            self.grp_advanced,
+            "Turnaround Intensity",
+            self.var_level2_turnaround_intensity,
+            0.0,
+            1.0,
+            self._regenerate,
+        )
+        self._add_slider(
+            self.grp_advanced,
+            "Swing Amount",
+            self.var_level2_swing_amount,
+            0.0,
+            1.0,
+            self._regenerate,
+        )
+        self._add_slider(
+            self.grp_advanced,
+            "Syncopation",
+            self.var_level2_syncopation,
+            0.0,
+            1.0,
+            self._regenerate,
+        )
+        self._add_slider(
+            self.grp_advanced,
+            "Chord Tone Anchoring",
+            self.var_level2_chord_tone_anchoring,
+            0.0,
+            1.0,
+            self._regenerate,
+        )
+        self._add_slider(
+            self.grp_advanced,
+            "Melodic Range",
+            self.var_level2_melodic_range,
+            0.0,
+            1.0,
+            self._regenerate,
+        )
+        self._add_slider(
+            self.grp_advanced,
+            "Motif Repetition",
+            self.var_level2_motif_repetition,
+            0.0,
+            1.0,
+            self._regenerate,
+        )
+        self._add_slider(
+            self.grp_advanced,
+            "Form Strictness",
+            self.var_level2_form_strictness,
+            0.0,
+            1.0,
+            self._regenerate,
+        )
+
+        l2_rows = ttk.Frame(self.grp_advanced)
+        l2_rows.pack(fill="x", pady=4)
+        ttk.Label(l2_rows, text="Groove Archetype:", width=18).pack(side="left")
+        self._level2_groove_combo = ttk.Combobox(
+            l2_rows,
+            textvariable=self.var_level2_groove,
+            values=[],
+            state="readonly",
+            width=18,
+        )
+        self._level2_groove_combo.pack(side="left", padx=(0, 6))
+        self._level2_groove_combo.bind("<<ComboboxSelected>>", lambda e: self._regenerate())
+        ttk.Label(l2_rows, text="Lift Profile:", width=12).pack(side="left")
+        self._level2_lift_combo = ttk.Combobox(
+            l2_rows,
+            textvariable=self.var_level2_lift,
+            values=[],
+            state="readonly",
+            width=12,
+        )
+        self._level2_lift_combo.pack(side="left")
+        self._level2_lift_combo.bind("<<ComboboxSelected>>", lambda e: self._regenerate())
 
         grp_play = ttk.LabelFrame(right, text="Playback")
         grp_play.pack(fill="x")
@@ -200,6 +362,80 @@ class App(tk.Tk):
         var.trace_add("write", lambda *_: update_label())
         return scale
 
+    def _toggle_advanced(self):
+        if self.var_show_advanced.get():
+            self.grp_advanced.pack(fill="x")
+        else:
+            self.grp_advanced.pack_forget()
+
+    def _sync_level2_vars(self, derived):
+        if self._level2_groove_combo is not None:
+            self._level2_groove_combo["values"] = [name for name, _ in derived.style_profile.groove_archetypes]
+        if self._level2_lift_combo is not None:
+            self._level2_lift_combo["values"] = [name for name, _ in derived.style_profile.lift_profiles]
+        if self.var_override_level2.get():
+            return
+        lvl2 = derived.level2
+        self.var_level2_functional_clarity.set(lvl2.functional_clarity)
+        self.var_level2_chromaticism.set(lvl2.chromaticism)
+        self.var_level2_extension_richness.set(lvl2.extension_richness)
+        self.var_level2_turnaround_intensity.set(lvl2.turnaround_intensity)
+        self.var_level2_swing_amount.set(lvl2.swing_amount)
+        self.var_level2_syncopation.set(lvl2.syncopation)
+        self.var_level2_chord_tone_anchoring.set(lvl2.chord_tone_anchoring)
+        self.var_level2_melodic_range.set(lvl2.melodic_range)
+        self.var_level2_motif_repetition.set(lvl2.motif_repetition)
+        self.var_level2_form_strictness.set(lvl2.form_strictness)
+        self.var_level2_groove.set(lvl2.groove_archetype)
+        self.var_level2_lift.set(lvl2.lift_profile)
+
+    def _apply_level2_overrides(self, derived):
+        if not self.var_override_level2.get():
+            return derived
+
+        level2 = Level2Knobs(
+            functional_clarity=clamp01(float(self.var_level2_functional_clarity.get())),
+            chromaticism=clamp01(float(self.var_level2_chromaticism.get())),
+            extension_richness=clamp01(float(self.var_level2_extension_richness.get())),
+            turnaround_intensity=clamp01(float(self.var_level2_turnaround_intensity.get())),
+            groove_archetype=(self.var_level2_groove.get() or derived.level2.groove_archetype),
+            swing_amount=clamp01(float(self.var_level2_swing_amount.get())),
+            syncopation=clamp01(float(self.var_level2_syncopation.get())),
+            chord_tone_anchoring=clamp01(float(self.var_level2_chord_tone_anchoring.get())),
+            melodic_range=clamp01(float(self.var_level2_melodic_range.get())),
+            motif_repetition=clamp01(float(self.var_level2_motif_repetition.get())),
+            form_strictness=clamp01(float(self.var_level2_form_strictness.get())),
+            lift_profile=(self.var_level2_lift.get() or derived.level2.lift_profile),
+        )
+
+        intensity = derived.level1.intensity
+        profile = derived.style_profile
+        repetition = clamp01(lerp(profile.repetition_range[0], profile.repetition_range[1], level2.motif_repetition))
+        variation = clamp01(
+            lerp(
+                profile.variation_range[0],
+                profile.variation_range[1],
+                intensity * 0.5 + (1 - level2.motif_repetition) * 0.5,
+            )
+        )
+        cadence_strength = clamp01(
+            lerp(
+                profile.cadence_strength_range[0],
+                profile.cadence_strength_range[1],
+                level2.turnaround_intensity,
+            )
+        )
+
+        return replace(
+            derived,
+            level2=level2,
+            syncopation=level2.syncopation,
+            swing=level2.swing_amount,
+            repetition=repetition,
+            variation=variation,
+            cadence_strength=cadence_strength,
+        )
+
     def _refresh_outputs(self):
         try:
             names = mido.get_output_names()
@@ -217,31 +453,30 @@ class App(tk.Tk):
             self.var_output.set(names[0])
 
     def _get_controls(self) -> Controls:
-        density = clamp01(float(self.var_density.get()))
-        syncopation = clamp01(float(self.var_syncopation.get()))
-        swing = clamp01(float(self.var_swing.get()))
-        chord_complexity = clamp01(float(self.var_chord_complexity.get()))
-        repetition = clamp01(float(self.var_repetition.get()))
-        variation = clamp01(float(self.var_variation.get()))
-        energy = clamp01(float(self.var_energy.get()))
-        cadence_strength = clamp01(float(self.var_cadence_strength.get()))
-        style = str(self.var_progression_style.get() or "pop")
+        style_label = str(self.var_style.get() or "Modern Pop")
+        style = self.STYLE_LABELS.get(style_label, "pop")
+        mood_brightness = clamp01(float(self.var_mood_brightness.get()))
+        mood_energy = clamp01(float(self.var_mood_energy.get()))
+        mood_tension = clamp01(1.0 - float(self.var_mood_tension.get()))
+        intensity = clamp01(float(self.var_intensity.get()))
+        complexity = clamp01(float(self.var_complexity.get()))
+        tightness = clamp01(float(self.var_tightness.get()))
         seed = int(self.var_seed.get() or DEFAULT_SEED)
 
-        intensity = clamp01(energy * 0.4 + variation * 0.3 + density * 0.2 + cadence_strength * 0.1)
-        mood_valence = clamp01(energy * 0.55 + repetition * 0.30 + (1 - chord_complexity) * 0.15)
-        mood_arousal = clamp01(energy * 0.6 + density * 0.2 + (1 - repetition) * 0.2)
-        tightness = clamp01(1.0 - (syncopation * 0.6 + swing * 0.4))
+        mood_valence = mood_brightness
+        mood_arousal = mood_energy
+        complexity = clamp01(complexity * 0.7 + mood_tension * 0.3)
 
         style_mood = StyleMoodControls(
             style=style,
             mood_valence=mood_valence,
             mood_arousal=mood_arousal,
             intensity=intensity,
-            complexity=chord_complexity,
+            complexity=complexity,
             tightness=tightness,
         )
         derived = map_controls(style_mood, seed=seed)
+        derived = self._apply_level2_overrides(derived)
         derived = replace(
             derived,
             humanize_timing_ms=max(0.0, float(self.var_humanize_timing_ms.get())),
@@ -262,6 +497,7 @@ class App(tk.Tk):
         try:
             ctrl = self._get_controls()
             self._cached_ctrl = ctrl
+            self._sync_level2_vars(ctrl.derived)
 
             mid, plan, chord_segments, part_events, report = build_song_bundle(
                 ctrl, include_parts=("melody", "harmony", "bass", "drums")
@@ -316,6 +552,7 @@ class App(tk.Tk):
                 tightness=ctrl.style_mood.tightness,
             )
         )
+        lines.append(f"  level2_override={'on' if self.var_override_level2.get() else 'off'}")
         lines.append("")
 
         lines.append("Derived Knobs:")
@@ -324,6 +561,29 @@ class App(tk.Tk):
         lines.append(f"  energy={ctrl.derived.energy:.2f}, cadence_strength={ctrl.derived.cadence_strength:.2f}")
         lines.append(f"  humanize_timing_ms={ctrl.derived.humanize_timing_ms:.1f}, humanize_velocity={ctrl.derived.humanize_velocity:.2f}")
         lines.append(f"  groove={ctrl.derived.level2.groove_archetype}, lift={ctrl.derived.level2.lift_profile}")
+        lines.append("  Level 2 Mapping:")
+        lines.append(
+            "    functional_clarity={:.2f}, chromaticism={:.2f}, extension_richness={:.2f}".format(
+                ctrl.derived.level2.functional_clarity,
+                ctrl.derived.level2.chromaticism,
+                ctrl.derived.level2.extension_richness,
+            )
+        )
+        lines.append(
+            "    turnaround_intensity={:.2f}, chord_tone_anchoring={:.2f}, melodic_range={:.2f}".format(
+                ctrl.derived.level2.turnaround_intensity,
+                ctrl.derived.level2.chord_tone_anchoring,
+                ctrl.derived.level2.melodic_range,
+            )
+        )
+        lines.append(
+            "    motif_repetition={:.2f}, form_strictness={:.2f}, swing_amount={:.2f}, syncopation={:.2f}".format(
+                ctrl.derived.level2.motif_repetition,
+                ctrl.derived.level2.form_strictness,
+                ctrl.derived.level2.swing_amount,
+                ctrl.derived.level2.syncopation,
+            )
+        )
         lines.append("")
 
         lines.append("Chord segments (by bar):")

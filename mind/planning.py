@@ -5,7 +5,6 @@ import random
 
 from .models import BarModifiers, MelodyContourProfile, RhythmProfile, SectionDef, SongPlan
 from .utils import clamp, clamp01, lerp, pick_weighted
-from .constants import STYLE_RHYTHM_ARCHETYPES
 from .theory.progression import ProgressionGenerator
 
 
@@ -99,6 +98,16 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
       templates[section] = {"name": ..., "degrees": [...], "source": ...}
     """
     all_templates = get_pop_templates(rng, ctrl.mode, ctrl.derived.progression_style)
+    level2 = ctrl.derived.level2
+    functional_bias = lerp(0.75, 1.35, level2.functional_clarity)
+    mixture_bias = lerp(0.75, 1.40, (level2.chromaticism * 0.65 + level2.extension_richness * 0.35))
+    repetition_bias = lerp(0.90, 1.20, level2.motif_repetition)
+    form_bias = lerp(0.85, 1.25, level2.form_strictness)
+    lift_bias = {
+        "lift": 1.20,
+        "plateau": 1.00,
+        "drop": 0.85,
+    }.get(level2.lift_profile, 1.00)
 
     chorus_pool = []
     verse_pool = []
@@ -111,29 +120,29 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
         # chorus likes pop/anthem/classic
         wc = 1.0
         if "anthem" in tags:
-            wc *= 1.8
+            wc *= 1.8 * lift_bias
         if "classic" in tags:
-            wc *= 1.5
+            wc *= 1.5 * functional_bias
         if "simple" in tags:
-            wc *= 1.2
+            wc *= 1.2 * form_bias
         if "mixture" in tags:
-            wc *= lerp(0.8, 1.35, ctrl.derived.chord_complexity)
+            wc *= mixture_bias
 
         # verse likes a bit more functional variety
         wv = 1.0
         if "functional" in tags:
-            wv *= 1.6
+            wv *= 1.6 * functional_bias
         if "smooth" in tags:
             wv *= 1.3
         if "mixture" in tags:
-            wv *= lerp(0.7, 1.45, ctrl.derived.variation)
+            wv *= mixture_bias
 
         # bridge likes contrast and mixture/functional
         wb = 1.0
         if "mixture" in tags:
-            wb *= 1.8
+            wb *= 1.8 * mixture_bias
         if "functional" in tags:
-            wb *= 1.4
+            wb *= 1.4 * functional_bias
         if "smooth" in tags:
             wb *= 1.2
 
@@ -141,14 +150,14 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
         wi = 1.0
         wo = 1.0
         if "simple" in tags:
-            wi *= 1.6
-            wo *= 1.6
+            wi *= 1.6 * form_bias
+            wo *= 1.6 * form_bias
         if "anthem" in tags:
-            wi *= 0.9
-            wo *= 0.9
+            wi *= 0.9 * lift_bias
+            wo *= 0.9 * lift_bias
         if "mixture" in tags:
-            wi *= 0.9
-            wo *= 1.0
+            wi *= 0.9 * mixture_bias
+            wo *= 1.0 * mixture_bias
 
         chorus_pool.append((t, wc))
         verse_pool.append((t, wv))
@@ -165,13 +174,13 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
     bridge_t = pick_template(bridge_pool)
 
     # repetition affects template matching
-    if ctrl.derived.repetition >= 0.70 and rng.random() < lerp(0.35, 0.75, ctrl.derived.repetition):
+    if level2.motif_repetition >= 0.70 and rng.random() < lerp(0.35, 0.75, level2.motif_repetition):
         anthem_candidates = [t for t in all_templates if "anthem" in (t.get("tags") or [])]
         if anthem_candidates:
             chosen = rng.choice(anthem_candidates)
             chorus_t = {"name": chosen["name"], "degrees": chosen["degrees"], "source": "seed_library_anthem"}
 
-    if ctrl.derived.repetition >= 0.80 and rng.random() < lerp(0.20, 0.65, ctrl.derived.repetition):
+    if level2.motif_repetition >= 0.80 and rng.random() < lerp(0.20, 0.65, level2.motif_repetition):
         chorus_t = verse_t
 
     return {
@@ -186,17 +195,37 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
 def build_rhythm_profile(ctrl, rng_master: random.Random) -> RhythmProfile:
     rng = random.Random(rng_master.randint(0, 2**31 - 1))
 
-    style_key = (ctrl.derived.progression_style or "").lower()
+    groove_map = {
+        "straight": "straight_pop",
+        "straight_pop": "straight_pop",
+        "four_on_floor": "four_on_floor",
+        "half_time": "half_time",
+        "bouncy": "bouncy",
+        "swing": "bouncy",
+        "laid_back": "half_time",
+        "latin": "bouncy",
+        "waltz": "half_time",
+        "march": "straight_pop",
+    }
+    profile = ctrl.derived.style_profile
+    swing_min, swing_max = profile.swing_range
+    swing_span = max(0.001, swing_max - swing_min)
+    swing_norm = clamp01((ctrl.derived.swing - swing_min) / swing_span)
 
-    archetypes = STYLE_RHYTHM_ARCHETYPES.get(
-        style_key,
-        [
-            ("straight_pop", 0.40),
-            ("four_on_floor", 0.25),
-            ("half_time", 0.18),
-            ("bouncy", 0.17),
-        ],
-    )
+    mapped_weights: dict[str, float] = {}
+    for name, weight in profile.groove_archetypes:
+        mapped_name = groove_map.get(name, "straight_pop")
+        adj = 1.0
+        if mapped_name in {"bouncy", "half_time"}:
+            adj *= lerp(0.90, 1.15, swing_norm)
+        if mapped_name == "four_on_floor":
+            adj *= lerp(1.05, 0.90, swing_norm)
+        mapped_weights[mapped_name] = mapped_weights.get(mapped_name, 0.0) + weight * adj
+
+    preferred = groove_map.get(ctrl.derived.level2.groove_archetype, "straight_pop")
+    mapped_weights[preferred] = mapped_weights.get(preferred, 0.0) + 0.35
+
+    archetypes = sorted(mapped_weights.items())
     archetype = pick_weighted(rng, archetypes)
 
     base_hat_steps = [0, 2, 4, 6, 8, 10, 12, 14]
@@ -204,22 +233,22 @@ def build_rhythm_profile(ctrl, rng_master: random.Random) -> RhythmProfile:
     if archetype == "straight_pop":
         base_kick = [0, 8]
         base_snare = [4, 12]
-        hat_16th_bias = lerp(0.10, 0.55, ctrl.derived.density)
+        hat_16th_bias = lerp(0.10, 0.55, ctrl.derived.density) * lerp(0.95, 1.05, swing_norm)
         kick_sync_bias = lerp(0.08, 0.40, ctrl.derived.syncopation)
     elif archetype == "four_on_floor":
         base_kick = [0, 4, 8, 12]
         base_snare = [4, 12]
-        hat_16th_bias = lerp(0.10, 0.65, ctrl.derived.density)
+        hat_16th_bias = lerp(0.10, 0.65, ctrl.derived.density) * lerp(0.90, 1.05, swing_norm)
         kick_sync_bias = lerp(0.05, 0.25, ctrl.derived.syncopation)
     elif archetype == "half_time":
         base_kick = [0, 6, 8]
         base_snare = [8]
-        hat_16th_bias = lerp(0.08, 0.55, ctrl.derived.density)
+        hat_16th_bias = lerp(0.08, 0.55, ctrl.derived.density) * lerp(0.95, 1.10, swing_norm)
         kick_sync_bias = lerp(0.12, 0.55, ctrl.derived.syncopation)
     else:  # bouncy
         base_kick = [0, 7, 10]
         base_snare = [4, 12]
-        hat_16th_bias = lerp(0.18, 0.80, ctrl.derived.density)
+        hat_16th_bias = lerp(0.18, 0.80, ctrl.derived.density) * lerp(1.00, 1.15, swing_norm)
         kick_sync_bias = lerp(0.15, 0.60, ctrl.derived.syncopation)
 
     fill_style = pick_weighted(rng, [("snare_roll", 0.60), ("tom_fill", 0.40)])
@@ -277,7 +306,16 @@ def build_melody_contour(ctrl, rng_master: random.Random) -> MelodyContourProfil
         intensity_bounds = (0.35, 1.00)
     kind = pick_weighted(rng, kinds)
 
-    base = (ctrl.derived.variation * 0.6 + ctrl.derived.energy * 0.4)
+    lift_bias = {
+        "lift": 0.12,
+        "plateau": 0.00,
+        "drop": -0.08,
+    }.get(ctrl.derived.level2.lift_profile, 0.0)
+    base = (
+        ctrl.derived.level2.melodic_range * 0.55
+        + (1 - ctrl.derived.level2.motif_repetition) * 0.45
+    )
+    base = clamp01(base + lift_bias)
     intensity = clamp01(lerp(intensity_bounds[0], intensity_bounds[1], base))
     intensity = clamp01(intensity * lerp(0.88, 1.08, rng.random()))
 
@@ -287,6 +325,18 @@ def build_melody_contour(ctrl, rng_master: random.Random) -> MelodyContourProfil
 def build_song_plan(ctrl) -> SongPlan:
     rng = random.Random(ctrl.seed)
     length = max(1, int(ctrl.length_bars))
+    level2 = ctrl.derived.level2
+    lift_density_bias = {
+        "lift": 1.08,
+        "plateau": 1.00,
+        "drop": 0.92,
+    }.get(level2.lift_profile, 1.00)
+    lift_energy_bias = {
+        "lift": 1.12,
+        "plateau": 1.00,
+        "drop": 0.90,
+    }.get(level2.lift_profile, 1.00)
+    motif_density_bias = lerp(1.08, 0.92, level2.motif_repetition)
 
     phrase_len = 4
     phrase_count = int(math.ceil(length / phrase_len))
@@ -353,6 +403,17 @@ def build_song_plan(ctrl) -> SongPlan:
             var_mul = lerp(0.85, 1.10, rng.random())
             rep_mul = lerp(1.05, 1.35, rng.random())
             melody_shift = int(round(lerp(-3, +1, rng.random())))
+
+        density_mul *= motif_density_bias
+        if section == "chorus":
+            density_mul *= lift_density_bias
+            energy_mul *= lift_energy_bias
+        elif section in {"intro", "outro"}:
+            density_mul *= lerp(1.02, 0.90, level2.form_strictness)
+        elif section == "bridge":
+            density_mul *= lerp(0.95, 1.08, 1 - level2.form_strictness)
+
+        density_mul = lerp(density_mul, 1.0, level2.form_strictness * 0.25)
 
         if is_phrase_end and b != length - 1:
             energy_mul *= lerp(1.03, 1.10, clamp01(ctrl.derived.cadence_strength))

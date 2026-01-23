@@ -9,8 +9,8 @@ import mido
 from mido import Message, MidiFile
 
 from .constants import DEFAULT_SEED, NOTE_NAMES
-from .control_mapping import StyleMoodControls, map_controls
-from .models import Controls
+from .control_mapping import map_controls
+from .models import Controls, StyleMoodControls
 from .midi_build import build_midifile, build_song_bundle
 from .planning import build_song_plan
 from .harmony import build_chord_segments

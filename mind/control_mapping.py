@@ -1,79 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import random
 
+from .models import DerivedControls, Level2Knobs, StyleMoodControls, StyleProfile
 from .utils import clamp01, lerp, pick_weighted
-
-
-@dataclass(frozen=True)
-class StyleMoodControls:
-    """
-    Level 1 controls (human-facing).
-
-    All values are normalized 0..1.
-    """
-
-    style: str
-    mood_valence: float
-    mood_arousal: float
-    intensity: float
-    complexity: float
-    tightness: float
-
-
-@dataclass(frozen=True)
-class Level2Knobs:
-    """Level 2 controls derived from the Level 1 intent."""
-
-    functional_clarity: float
-    chromaticism: float
-    extension_richness: float
-    turnaround_intensity: float
-    groove_archetype: str
-    swing_amount: float
-    syncopation: float
-    chord_tone_anchoring: float
-    melodic_range: float
-    motif_repetition: float
-    form_strictness: float
-    lift_profile: str
-
-
-@dataclass(frozen=True)
-class StyleProfile:
-    """Defaults/ranges per style used by the mapper."""
-
-    density_range: tuple[float, float]
-    syncopation_range: tuple[float, float]
-    swing_range: tuple[float, float]
-    chord_complexity_range: tuple[float, float]
-    repetition_range: tuple[float, float]
-    variation_range: tuple[float, float]
-    energy_range: tuple[float, float]
-    cadence_strength_range: tuple[float, float]
-    groove_archetypes: tuple[tuple[str, float], ...]
-    lift_profiles: tuple[tuple[str, float], ...]
-
-
-@dataclass(frozen=True)
-class DerivedControls:
-    """Controls used by the engine after mapping."""
-
-    level1: StyleMoodControls
-    level2: Level2Knobs
-    style_profile: StyleProfile
-    progression_style: str
-    density: float
-    syncopation: float
-    swing: float
-    chord_complexity: float
-    repetition: float
-    variation: float
-    energy: float
-    cadence_strength: float
-    humanize_timing_ms: float
-    humanize_velocity: float
 
 
 STYLE_PROFILES: dict[str, StyleProfile] = {

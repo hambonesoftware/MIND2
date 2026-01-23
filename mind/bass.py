@@ -20,6 +20,7 @@ from .utils import (
     key_to_pc,
     choose_register_base,
     nearest_in_set,
+    derive_groove_sync,
 )
 
 
@@ -83,6 +84,8 @@ def generate_bass_track(ctrl: Controls, chord_segments: list[ChordSegment], plan
     rng = random.Random(ctrl.seed + 202)
     tonic_pc = key_to_pc(ctrl.key_name)
     scale = scale_pcs(tonic_pc, ctrl.mode)
+    groove_level, sync_base = derive_groove_sync(ctrl.derived.level2, plan.rhythm.archetype)
+    anchor_strength = clamp01(ctrl.derived.level2.chord_tone_anchoring)
 
     _, _, bass_base = choose_register_base()
     low = bass_base - 2
@@ -95,14 +98,14 @@ def generate_bass_track(ctrl: Controls, chord_segments: list[ChordSegment], plan
 
     bass_cell = _choose_bass_cell(rng, plan.rhythm.archetype, ctrl.derived.progression_style)
 
-    anticipate_prob_base = clamp01(lerp(0.05, 0.35, ctrl.derived.syncopation))
+    anticipate_prob_base = clamp01(lerp(0.05, 0.35, sync_base))
     approach_prob_base = clamp01(lerp(0.03, 0.16, ctrl.derived.chord_complexity))
 
     for seg in chord_segments:
         mod = plan.bar_mods[seg.bar_index]
 
-        density_eff = clamp01(ctrl.derived.density * mod.density_mul)
-        sync_eff = clamp01(ctrl.derived.syncopation * mod.sync_mul)
+        density_eff = clamp01(ctrl.derived.density * lerp(0.85, 1.12, groove_level) * mod.density_mul)
+        sync_eff = clamp01(sync_base * mod.sync_mul)
         energy_eff = clamp01(ctrl.derived.energy * mod.energy_mul)
 
         base_vel = int(round(base_vel_global * lerp(0.90, 1.10, energy_eff)))
@@ -140,7 +143,7 @@ def generate_bass_track(ctrl: Controls, chord_segments: list[ChordSegment], plan
                 cell_steps.append(extra)
                 cell_steps = sorted(set(cell_steps))
 
-        anticipate_prob = clamp01(anticipate_prob_base * lerp(0.85, 1.25, sync_eff))
+        anticipate_prob = clamp01(anticipate_prob_base * lerp(0.85, 1.20, sync_eff) * lerp(1.05, 0.85, anchor_strength))
         approach_prob = clamp01(approach_prob_base * lerp(0.85, 1.25, density_eff))
 
         for step in cell_steps:

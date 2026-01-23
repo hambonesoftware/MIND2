@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 
 from .models import DerivedControls, Level2Knobs, StyleMoodControls, StyleProfile
-from .utils import clamp01, lerp, pick_weighted
+from .utils import clamp01, lerp, pick_weighted, map_tightness_to_timing
 
 
 STYLE_PROFILES: dict[str, StyleProfile] = {
@@ -186,7 +186,10 @@ def map_controls(level1: StyleMoodControls, seed: int) -> DerivedControls:
         lift_weights.append((name, base_w * adj))
     lift_profile = pick_weighted(rng, lift_weights)
 
-    swing_amount = clamp01(lerp(profile.swing_range[0], profile.swing_range[1], (1 - tightness) * 0.7 + intensity * 0.3))
+    swing_amount, humanize_timing_ms, humanize_velocity = map_tightness_to_timing(
+        tightness,
+        profile.swing_range,
+    )
     syncopation = clamp01(lerp(profile.syncopation_range[0], profile.syncopation_range[1], 1 - tightness))
 
     level2 = Level2Knobs(
@@ -216,9 +219,6 @@ def map_controls(level1: StyleMoodControls, seed: int) -> DerivedControls:
     variation = clamp01(lerp(profile.variation_range[0], profile.variation_range[1], intensity * 0.5 + (1 - level2.motif_repetition) * 0.5))
     energy = clamp01(lerp(profile.energy_range[0], profile.energy_range[1], intensity * 0.65 + arousal * 0.35))
     cadence_strength = clamp01(lerp(profile.cadence_strength_range[0], profile.cadence_strength_range[1], level2.turnaround_intensity))
-
-    humanize_timing_ms = lerp(2.0, 14.0, 1 - tightness)
-    humanize_velocity = clamp01(lerp(0.04, 0.22, 1 - tightness))
 
     return DerivedControls(
         level1=StyleMoodControls(

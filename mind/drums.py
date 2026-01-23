@@ -16,7 +16,7 @@ from .constants import (
     DRUM_TOM_MID,
 )
 from .models import Controls, SongPlan
-from .utils import bar_step_to_abs_tick, clamp01, lerp, humanize_ticks, apply_swing_to_step, velocity_humanize
+from .utils import bar_step_to_abs_tick, clamp01, lerp, humanize_ticks, apply_swing_to_step, velocity_humanize, derive_groove_sync
 
 
 def _vary_steps(rng: random.Random, steps: list[int], add_prob: float, remove_prob: float, allowed_range=(0, 15)):
@@ -51,12 +51,13 @@ def generate_drums_track(ctrl: Controls, plan: SongPlan):
     base_hat_vel = int(round(lerp(40, 90, ctrl.derived.energy)))
 
     rp = plan.rhythm
+    groove_level, sync_base = derive_groove_sync(ctrl.derived.level2, rp.archetype)
 
     for bar in range(ctrl.length_bars):
         mod = plan.bar_mods[bar]
 
-        density_eff = clamp01(ctrl.derived.density * mod.density_mul)
-        sync_eff = clamp01(ctrl.derived.syncopation * mod.sync_mul)
+        density_eff = clamp01(ctrl.derived.density * lerp(0.85, 1.12, groove_level) * mod.density_mul)
+        sync_eff = clamp01(sync_base * mod.sync_mul)
         energy_eff = clamp01(ctrl.derived.energy * mod.energy_mul)
         variation_eff = clamp01(ctrl.derived.variation * mod.variation_mul)
 

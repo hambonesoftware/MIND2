@@ -7,6 +7,7 @@ from mido import Message
 
 from .constants import DRUM_CHANNEL, PPQ, STYLE_RHYTHM_ARCHETYPES
 from .models import Controls, SongPlan, ChordSegment
+from .control_mapping import map_controls
 from .utils import pc_to_name, midi_note_name, clamp, ticks_to_time_seconds, bar_of_tick, step_of_tick_in_bar
 from .theory.analysis import detect_cadence, roman_numeral
 from .theory.engine import analyze as analyze_plugins, registered as registered_plugins
@@ -31,6 +32,12 @@ def _extract_note_ons(events: list[tuple[int, Message]], channel: int | None = N
     return note_ons
 
 
+def _value_changed(current: Any, base: Any, tol: float = 1e-6) -> bool:
+    if isinstance(current, float) and isinstance(base, float):
+        return abs(current - base) > tol
+    return current != base
+
+
 def build_song_report(
     ctrl: Controls,
     plan: SongPlan,
@@ -40,9 +47,48 @@ def build_song_report(
 ):
     """Build a JSON-serializable report for later analysis."""
     style_key = (ctrl.derived.progression_style or "pop").strip().lower()
+    base_derived = map_controls(ctrl.style_mood, seed=ctrl.seed)
+    level2_overrides: dict[str, dict[str, Any]] = {}
+    for field, value in asdict(ctrl.derived.level2).items():
+        base_value = getattr(base_derived.level2, field)
+        if _value_changed(value, base_value):
+            level2_overrides[field] = {"base": base_value, "value": value}
+    humanize_overrides = {}
+    if _value_changed(ctrl.derived.humanize_timing_ms, base_derived.humanize_timing_ms):
+        humanize_overrides["timing_ms"] = {
+            "base": base_derived.humanize_timing_ms,
+            "value": ctrl.derived.humanize_timing_ms,
+        }
+    if _value_changed(ctrl.derived.humanize_velocity, base_derived.humanize_velocity):
+        humanize_overrides["velocity"] = {
+            "base": base_derived.humanize_velocity,
+            "value": ctrl.derived.humanize_velocity,
+        }
     report: dict[str, Any] = {
         "report_version": "pop_knob_player_v2",
         "controls": asdict(ctrl),
+        "inputs": {
+            "style_mood": asdict(ctrl.style_mood),
+            "overrides": {
+                "level2": level2_overrides,
+                "humanize": humanize_overrides,
+            },
+        },
+        "derived_parameters": {
+            "level2": asdict(ctrl.derived.level2),
+            "engine": {
+                "density": ctrl.derived.density,
+                "syncopation": ctrl.derived.syncopation,
+                "swing": ctrl.derived.swing,
+                "chord_complexity": ctrl.derived.chord_complexity,
+                "repetition": ctrl.derived.repetition,
+                "variation": ctrl.derived.variation,
+                "energy": ctrl.derived.energy,
+                "cadence_strength": ctrl.derived.cadence_strength,
+                "humanize_timing_ms": ctrl.derived.humanize_timing_ms,
+                "humanize_velocity": ctrl.derived.humanize_velocity,
+            },
+        },
         "style_profile": {
             "style": style_key,
             "rhythm_archetype": plan.rhythm.archetype,

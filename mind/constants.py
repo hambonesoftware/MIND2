@@ -32,6 +32,12 @@ STYLE_RHYTHM_ARCHETYPES = {
         ("four_on_floor", 0.35),
         ("half_time", 0.10),
     ],
+    "modern_pop": [
+        ("four_on_floor", 0.45),
+        ("straight_pop", 0.30),
+        ("half_time", 0.15),
+        ("bouncy", 0.10),
+    ],
     "jazz": [
         ("bouncy", 0.70),
         ("straight_pop", 0.20),
@@ -46,11 +52,79 @@ STYLE_RHYTHM_ARCHETYPES = {
         ("four_on_floor", 0.30),
         ("half_time", 0.15),
     ],
+    "early_rock_roll": [
+        ("straight_pop", 0.45),
+        ("bouncy", 0.35),
+        ("four_on_floor", 0.20),
+    ],
 }
 
 STYLE_SWING_DEFAULTS = {
     "pop": (0.05, 0.15),
+    "modern_pop": (0.02, 0.12),
     "jazz": (0.55, 0.65),
     "classical": (0.0, 0.10),
     "rock": (0.0, 0.08),
+    "early_rock_roll": (0.02, 0.12),
+}
+
+STYLE_CHROMATICISM_DEFAULTS = {
+    "pop": (0.15, 0.45),
+    "modern_pop": (0.30, 0.65),
+    "jazz": (0.45, 0.80),
+    "classical": (0.05, 0.30),
+    "rock": (0.10, 0.40),
+    "early_rock_roll": (0.08, 0.30),
+}
+
+STYLE_EXTENSION_RICHNESS_DEFAULTS = {
+    "pop": (0.20, 0.55),
+    "modern_pop": (0.35, 0.75),
+    "jazz": (0.55, 0.90),
+    "classical": (0.15, 0.45),
+    "rock": (0.18, 0.50),
+    "early_rock_roll": (0.15, 0.40),
+}
+
+STYLE_FUNCTIONAL_CLARITY_DEFAULTS = {
+    "pop": (0.55, 0.85),
+    "modern_pop": (0.45, 0.75),
+    "jazz": (0.40, 0.75),
+    "classical": (0.70, 0.95),
+    "rock": (0.60, 0.85),
+    "early_rock_roll": (0.70, 0.90),
+}
+
+STYLE_GROOVE_ARCHETYPES = {
+    "pop": (
+        ("straight_pop", 0.55),
+        ("four_on_floor", 0.30),
+        ("bouncy", 0.15),
+    ),
+    "modern_pop": (
+        ("four_on_floor", 0.45),
+        ("straight_pop", 0.25),
+        ("bouncy", 0.20),
+        ("half_time", 0.10),
+    ),
+    "jazz": (
+        ("swing", 0.55),
+        ("laid_back", 0.30),
+        ("latin", 0.15),
+    ),
+    "classical": (
+        ("straight", 0.70),
+        ("waltz", 0.20),
+        ("march", 0.10),
+    ),
+    "rock": (
+        ("straight_pop", 0.55),
+        ("four_on_floor", 0.30),
+        ("bouncy", 0.15),
+    ),
+    "early_rock_roll": (
+        ("straight_pop", 0.45),
+        ("bouncy", 0.35),
+        ("four_on_floor", 0.20),
+    ),
 }

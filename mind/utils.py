@@ -5,6 +5,7 @@ from typing import Iterable
 
 from .constants import NOTE_NAMES, NAME_TO_PC, PPQ
 from .theory.scales import get_scale
+from .models import Level2Knobs
 
 
 def clamp01(x: float) -> float:
@@ -17,6 +18,36 @@ def clamp(x: float, lo: float, hi: float) -> float:
 
 def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
+
+
+def map_tightness_to_timing(tightness_0_1: float, swing_range: tuple[float, float]) -> tuple[float, float, float]:
+    tightness_0_1 = clamp01(tightness_0_1)
+    swing_min, swing_max = swing_range
+    swing_amount = clamp01(lerp(swing_min, swing_max, 1 - tightness_0_1))
+    humanize_timing_ms = lerp(2.0, 14.0, 1 - tightness_0_1)
+    humanize_velocity = clamp01(lerp(0.04, 0.22, 1 - tightness_0_1))
+    return swing_amount, humanize_timing_ms, humanize_velocity
+
+
+def derive_groove_sync(level2: Level2Knobs, rhythm_archetype: str | None = None) -> tuple[float, float]:
+    groove_bias_map = {
+        "straight": 0.55,
+        "straight_pop": 0.58,
+        "four_on_floor": 0.62,
+        "half_time": 0.48,
+        "bouncy": 0.68,
+        "swing": 0.70,
+        "laid_back": 0.52,
+        "latin": 0.66,
+        "waltz": 0.50,
+        "march": 0.56,
+    }
+    groove_key = rhythm_archetype or level2.groove_archetype
+    groove_bias = groove_bias_map.get(groove_key, 0.56)
+    swing_influence = level2.swing_amount * 0.6 + level2.syncopation * 0.4
+    groove = clamp01(lerp(groove_bias, 1.0, swing_influence))
+    syncopation = clamp01(lerp(level2.syncopation, min(1.0, level2.syncopation + groove * 0.18), 0.5))
+    return groove, syncopation
 
 
 def pick_weighted(rng: random.Random, items_with_weights):

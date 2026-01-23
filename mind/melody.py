@@ -23,6 +23,7 @@ from .utils import (
     key_to_pc,
     choose_register_base,
     nearest_in_set,
+    derive_groove_sync,
 )
 
 
@@ -59,6 +60,8 @@ def generate_melody_track(
     tonic_pc = key_to_pc(ctrl.key_name)
     scale = scale_pcs(tonic_pc, ctrl.mode)
     style_key = (style or ctrl.derived.progression_style or "pop").strip().lower()
+    groove_level, sync_base = derive_groove_sync(ctrl.derived.level2, plan.rhythm.archetype)
+    anchor_strength = clamp01(ctrl.derived.level2.chord_tone_anchoring)
 
     melody_base, _, _ = choose_register_base()
 
@@ -70,9 +73,9 @@ def generate_melody_track(
 
     def bar_density_energy_sync(bar_index: int):
         mod = plan.bar_mods[bar_index]
-        density_eff = clamp01(ctrl.derived.density * mod.density_mul)
+        density_eff = clamp01(ctrl.derived.density * lerp(0.85, 1.12, groove_level) * mod.density_mul)
         energy_eff = clamp01(ctrl.derived.energy * mod.energy_mul)
-        sync_eff = clamp01(ctrl.derived.syncopation * mod.sync_mul)
+        sync_eff = clamp01(sync_base * mod.sync_mul)
         variation_eff = clamp01(ctrl.derived.variation * mod.variation_mul)
         repetition_eff = clamp01(ctrl.derived.repetition * mod.repetition_mul)
         return mod, density_eff, energy_eff, sync_eff, variation_eff, repetition_eff
@@ -170,7 +173,13 @@ def generate_melody_track(
 
             is_strong = (s in (0, 4, 8, 12))
             is_offbeat = (s in (2, 6, 10, 14))
-            choose_from = chord_tones if (is_strong and chord_tones) else (scale_tones if scale_tones else chord_tones)
+            strong_anchor_prob = lerp(0.35, 0.95, anchor_strength)
+            weak_anchor_prob = lerp(0.10, 0.50, anchor_strength)
+            choose_from = scale_tones if scale_tones else chord_tones
+            if is_strong and chord_tones and rng.random() < strong_anchor_prob:
+                choose_from = chord_tones
+            elif (not is_strong) and chord_tones and rng.random() < weak_anchor_prob:
+                choose_from = chord_tones + (scale_tones if scale_tones else [])
             if style_key == "pop" and s in (0, 8) and chord_tones:
                 choose_from = chord_tones
             if style_key == "jazz" and is_offbeat and chord_tones:

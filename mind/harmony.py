@@ -178,8 +178,8 @@ def _resolve_token_to_chord(tonic_pc: int, mode: str, token, rng: random.Random)
     return root_pc, quality, t, True, f"tok:{t}"
 
 
-def _choose_extension(ctrl, rng: random.Random, section: str, label: str, quality: str) -> str:
-    c = clamp01(ctrl.derived.chord_complexity)
+def _choose_extension(extension_richness: float, rng: random.Random, section: str, label: str, quality: str) -> str:
+    c = clamp01(extension_richness)
     if section == "chorus":
         c = clamp01(c * 1.15)
 
@@ -264,7 +264,8 @@ def make_chord_segment(
     plan: SongPlan,
 ) -> ChordSegment:
     mod = plan.bar_mods[bar]
-    chord_complexity_eff = clamp01(ctrl.derived.chord_complexity * mod.chord_comp_mul)
+    chroma_eff = clamp01(ctrl.derived.level2.chromaticism * mod.chord_comp_mul)
+    extension_eff = clamp01(ctrl.derived.level2.extension_richness * mod.chord_comp_mul)
 
     root_pc, quality, label, is_borrowed, _tok_tag = _resolve_token_to_chord(tonic_pc, ctrl.mode, token, rng)
 
@@ -272,7 +273,7 @@ def make_chord_segment(
         label = forced_label
 
     if ctrl.mode == "major":
-        mixture_prob = clamp01(lerp(0.00, 0.12, chord_complexity_eff) * lerp(0.25, 1.00, ctrl.derived.variation))
+        mixture_prob = clamp01(lerp(0.00, 0.18, chroma_eff) * lerp(0.25, 1.00, ctrl.derived.variation))
         mixture_prob *= (1.05 if section in ("bridge", "chorus") else 0.80)
         if (not is_borrowed) and rng.random() < mixture_prob:
             # Expanded modal interchange palette (major-key defaults).
@@ -293,14 +294,7 @@ def make_chord_segment(
             root_pc2, quality2, label2, borrowed2, _ = _resolve_token_to_chord(tonic_pc, ctrl.mode, choice, rng)
             root_pc, quality, label, is_borrowed = root_pc2, quality2, label2, borrowed2
 
-    # temp ctrl for extension choice
-    class _CtrlTmp:
-        pass
-
-    ctrl_tmp = _CtrlTmp()
-    ctrl_tmp.chord_complexity = chord_complexity_eff
-
-    extension = _choose_extension(ctrl_tmp, rng, section, label, quality)
+    extension = _choose_extension(extension_eff, rng, section, label, quality)
     pcs = _build_pcs_with_extension(root_pc, quality, extension, rng, ctrl.mode, label)
     inversion = guess_inversion(pcs, root_pc)
     function = harmonic_function(label, quality)
@@ -364,13 +358,17 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
         if bar in forced_tokens:
             token, forced_label = forced_tokens.pop(bar)
 
+        chroma_eff = clamp01(ctrl.derived.level2.chromaticism * mod.chord_comp_mul)
+        extension_eff = clamp01(ctrl.derived.level2.extension_richness * mod.chord_comp_mul)
+        turnaround_eff = clamp01(ctrl.derived.level2.turnaround_intensity * mod.variation_mul)
+
         do_turnaround = False
         if mod.is_phrase_end and bar != length - 1:
-            do_turnaround = (rng.random() < clamp01(lerp(0.20, 0.75, ctrl.derived.cadence_strength)))
+            do_turnaround = (rng.random() < clamp01(lerp(0.18, 0.80, turnaround_eff)))
 
-        cadence_prob = clamp01(lerp(0.25, 0.85, ctrl.derived.cadence_strength))
+        cadence_prob = clamp01(lerp(0.20, 0.88, turnaround_eff))
         if style_key == "jazz":
-            cadence_prob = clamp01(cadence_prob * 1.15)
+            cadence_prob = clamp01(cadence_prob * 1.15 + 0.05 * chroma_eff)
         elif style_key == "pop":
             cadence_prob = clamp01(cadence_prob * 0.75)
         elif style_key == "classical":
@@ -379,7 +377,8 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
         if mod.is_phrase_end and rng.random() < cadence_prob:
             cadence_choice = None
             if style_key == "jazz":
-                cadence_choice = pick_weighted(rng, [("ii_V_I", 0.70), ("V_I", 0.30)])
+                ii_v_weight = clamp01(lerp(0.40, 0.85, turnaround_eff))
+                cadence_choice = pick_weighted(rng, [("ii_V_I", ii_v_weight), ("V_I", 1.0 - ii_v_weight)])
             elif style_key == "classical":
                 cadence_choice = pick_weighted(rng, [("V_I", 0.55), ("ii_V_I", 0.45)])
             else:
@@ -396,6 +395,13 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
             else:
                 tok1, tok2 = 4, 0
                 lab1, lab2 = "V", "I"
+
+            if style_key == "jazz" and lab1 == "V" and rng.random() < lerp(0.08, 0.45, chroma_eff):
+                tok1 = "subV/I"
+                lab1 = "subV/I"
+            if style_key == "jazz" and lab2 == "V" and rng.random() < lerp(0.08, 0.45, chroma_eff):
+                tok2 = "subV/I"
+                lab2 = "subV/I"
 
             seg1 = make_chord_segment(
                 ctrl=ctrl,
@@ -426,7 +432,7 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
             segments.extend([seg1, seg2])
             continue
 
-        if bar == length - 1 and ctrl.derived.cadence_strength >= 0.45:
+        if bar == length - 1 and turnaround_eff >= 0.45:
             cadence_choice = pick_weighted(rng, [("V_I", 0.75), ("IV_I", 0.25)])
             if cadence_choice == "V_I":
                 tok1, tok2 = 4, 0
@@ -474,11 +480,18 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
             # Turnaround "push" into the next phrase.
             # We keep it mostly diatonic (V), but sometimes color it with a secondary dominant
             # (V/V) or a tritone substitute (subV/V) for a more sophisticated cadence.
-            push_token = (
-                pick_weighted(rng, [("V/V", 0.26), ("subV/V", 0.10), (4, 0.64)])
-                if ctrl.mode == "major"
-                else 4
-            )
+            if ctrl.mode == "major":
+                sec_dom_w = lerp(0.10, 0.38, chroma_eff)
+                sub_v_w = lerp(0.04, 0.22, chroma_eff) if style_key == "jazz" else lerp(0.02, 0.12, chroma_eff)
+                base_w = max(0.0, 1.0 - (sec_dom_w + sub_v_w))
+                push_weights = [(4, base_w), ("V/V", sec_dom_w), ("subV/V", sub_v_w)]
+                push_token = pick_weighted(rng, push_weights)
+            else:
+                push_token = 4
+            if style_key == "jazz":
+                dim_pass_prob = lerp(0.05, 0.28, chroma_eff) * lerp(0.80, 1.15, turnaround_eff)
+                if rng.random() < dim_pass_prob:
+                    push_token = "vii°"
             seg_main = make_chord_segment(
                 ctrl=ctrl,
                 tonic_pc=tonic_pc,
@@ -492,6 +505,16 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
                 rng=rng,
                 plan=plan,
             )
+            seg_push_label = None
+            if str(push_token) == "subV/V":
+                seg_push_label = "subV/V"
+            elif str(push_token) == "V/V":
+                seg_push_label = "V/V"
+            elif str(push_token) == "vii°":
+                seg_push_label = "vii°"
+            else:
+                seg_push_label = "V"
+
             seg_push = make_chord_segment(
                 ctrl=ctrl,
                 tonic_pc=tonic_pc,
@@ -499,7 +522,7 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
                 start_step=12,
                 end_step=16,
                 token=push_token,
-                forced_label="subV/V" if str(push_token) == "subV/V" else ("V/V" if str(push_token) == "V/V" else "V"),
+                forced_label=seg_push_label,
                 section=section,
                 template_tag=f"{tpl_name}|turnaround",
                 rng=rng,
@@ -512,6 +535,21 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
             next_token = degrees[(pos_in_phrase + 1) % len(degrees)]
             if rng.random() < lerp(0.18, 0.42, ctrl.derived.energy):
                 next_token = 4
+            next_forced_label = None
+            if style_key == "jazz":
+                ii_v_insert_prob = lerp(0.10, 0.55, turnaround_eff) * lerp(0.70, 1.20, extension_eff)
+                if rng.random() < ii_v_insert_prob:
+                    token = 1
+                    forced_label = "ii"
+                    next_token = 4
+                    next_forced_label = "V"
+                dim_pass_prob = lerp(0.06, 0.32, chroma_eff)
+                if rng.random() < dim_pass_prob and next_token == 0:
+                    token = "vii°"
+                    forced_label = "vii°"
+                if rng.random() < lerp(0.05, 0.35, chroma_eff) and next_token == 4:
+                    next_token = "subV/I"
+                    next_forced_label = "subV/I"
             seg1 = make_chord_segment(
                 ctrl=ctrl,
                 tonic_pc=tonic_pc,
@@ -532,7 +570,7 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
                 start_step=8,
                 end_step=16,
                 token=next_token,
-                forced_label=None,
+                forced_label=next_forced_label,
                 section=section,
                 template_tag=tpl_name,
                 rng=rng,
@@ -586,9 +624,9 @@ def generate_harmony_track(ctrl: Controls, chord_segments: list[ChordSegment], p
     events.append((0, Message("program_change", channel=HARMONY_CH, program=GM_PIANO, time=0)))
 
     voice_count = 3
-    if ctrl.derived.chord_complexity >= 0.55:
+    if ctrl.derived.level2.extension_richness >= 0.55:
         voice_count = 4
-    if ctrl.derived.chord_complexity >= 0.85 and rng.random() < 0.35:
+    if ctrl.derived.level2.extension_richness >= 0.85 and rng.random() < 0.35:
         voice_count = 5
 
     prev_voicing: list[int] = []

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import tkinter as tk
-from dataclasses import asdict
+from dataclasses import replace
 from tkinter import filedialog, messagebox, ttk
 
 import mido
 from mido import Message, MidiFile
 
 from .constants import DEFAULT_SEED, NOTE_NAMES
+from .control_mapping import StyleMoodControls, map_controls
 from .models import Controls
 from .midi_build import build_midifile, build_song_bundle
 from .planning import build_song_plan
@@ -216,23 +217,45 @@ class App(tk.Tk):
             self.var_output.set(names[0])
 
     def _get_controls(self) -> Controls:
+        density = clamp01(float(self.var_density.get()))
+        syncopation = clamp01(float(self.var_syncopation.get()))
+        swing = clamp01(float(self.var_swing.get()))
+        chord_complexity = clamp01(float(self.var_chord_complexity.get()))
+        repetition = clamp01(float(self.var_repetition.get()))
+        variation = clamp01(float(self.var_variation.get()))
+        energy = clamp01(float(self.var_energy.get()))
+        cadence_strength = clamp01(float(self.var_cadence_strength.get()))
+        style = str(self.var_progression_style.get() or "pop")
+        seed = int(self.var_seed.get() or DEFAULT_SEED)
+
+        intensity = clamp01(energy * 0.4 + variation * 0.3 + density * 0.2 + cadence_strength * 0.1)
+        mood_valence = clamp01(energy * 0.55 + repetition * 0.30 + (1 - chord_complexity) * 0.15)
+        mood_arousal = clamp01(energy * 0.6 + density * 0.2 + (1 - repetition) * 0.2)
+        tightness = clamp01(1.0 - (syncopation * 0.6 + swing * 0.4))
+
+        style_mood = StyleMoodControls(
+            style=style,
+            mood_valence=mood_valence,
+            mood_arousal=mood_arousal,
+            intensity=intensity,
+            complexity=chord_complexity,
+            tightness=tightness,
+        )
+        derived = map_controls(style_mood, seed=seed)
+        derived = replace(
+            derived,
+            humanize_timing_ms=max(0.0, float(self.var_humanize_timing_ms.get())),
+            humanize_velocity=clamp01(float(self.var_humanize_velocity.get())),
+        )
+
         return Controls(
             length_bars=int(self.var_length_bars.get()),
             bpm=int(self.var_bpm.get()),
             key_name=str(self.var_key.get()),
             mode=str(self.var_mode.get()),
-            density=clamp01(float(self.var_density.get())),
-            syncopation=clamp01(float(self.var_syncopation.get())),
-            swing=clamp01(float(self.var_swing.get())),
-            chord_complexity=clamp01(float(self.var_chord_complexity.get())),
-            repetition=clamp01(float(self.var_repetition.get())),
-            variation=clamp01(float(self.var_variation.get())),
-            energy=clamp01(float(self.var_energy.get())),
-            cadence_strength=clamp01(float(self.var_cadence_strength.get())),
-            humanize_timing_ms=max(0.0, float(self.var_humanize_timing_ms.get())),
-            humanize_velocity=clamp01(float(self.var_humanize_velocity.get())),
-            progression_style=str(self.var_progression_style.get() or "pop"),
-            seed=int(self.var_seed.get() or DEFAULT_SEED),
+            seed=seed,
+            style_mood=style_mood,
+            derived=derived,
         )
 
     def _regenerate(self):
@@ -281,11 +304,26 @@ class App(tk.Tk):
                 lines.append(f"    {sec_name}: {t['name']} -> {t['degrees']}")
         lines.append("")
 
-        lines.append("Knobs:")
-        lines.append(f"  density={ctrl.density:.2f}, syncopation={ctrl.syncopation:.2f}, swing={ctrl.swing:.2f}")
-        lines.append(f"  chord_complexity={ctrl.chord_complexity:.2f}, repetition={ctrl.repetition:.2f}, variation={ctrl.variation:.2f}")
-        lines.append(f"  energy={ctrl.energy:.2f}, cadence_strength={ctrl.cadence_strength:.2f}")
-        lines.append(f"  humanize_timing_ms={ctrl.humanize_timing_ms:.1f}, humanize_velocity={ctrl.humanize_velocity:.2f}")
+        lines.append("Level 1 (Style/Mood):")
+        lines.append(
+            "  style={style} valence={valence:.2f} arousal={arousal:.2f} intensity={intensity:.2f} "
+            "complexity={complexity:.2f} tightness={tightness:.2f}".format(
+                style=ctrl.style_mood.style,
+                valence=ctrl.style_mood.mood_valence,
+                arousal=ctrl.style_mood.mood_arousal,
+                intensity=ctrl.style_mood.intensity,
+                complexity=ctrl.style_mood.complexity,
+                tightness=ctrl.style_mood.tightness,
+            )
+        )
+        lines.append("")
+
+        lines.append("Derived Knobs:")
+        lines.append(f"  density={ctrl.derived.density:.2f}, syncopation={ctrl.derived.syncopation:.2f}, swing={ctrl.derived.swing:.2f}")
+        lines.append(f"  chord_complexity={ctrl.derived.chord_complexity:.2f}, repetition={ctrl.derived.repetition:.2f}, variation={ctrl.derived.variation:.2f}")
+        lines.append(f"  energy={ctrl.derived.energy:.2f}, cadence_strength={ctrl.derived.cadence_strength:.2f}")
+        lines.append(f"  humanize_timing_ms={ctrl.derived.humanize_timing_ms:.1f}, humanize_velocity={ctrl.derived.humanize_velocity:.2f}")
+        lines.append(f"  groove={ctrl.derived.level2.groove_archetype}, lift={ctrl.derived.level2.lift_profile}")
         lines.append("")
 
         lines.append("Chord segments (by bar):")

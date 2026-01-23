@@ -1,5 +1,6 @@
 import unittest
 
+from mind.control_mapping import StyleMoodControls, map_controls
 from mind.midi_build import build_song_bundle
 from mind.models import Controls
 from mind.theory import engine
@@ -31,23 +32,22 @@ class TestTheoryEngine(unittest.TestCase):
 
     def test_report_includes_plugins(self):
         engine.register(PluginTagPlugin())
+        style_mood = StyleMoodControls(
+            style="pop",
+            mood_valence=0.6,
+            mood_arousal=0.5,
+            intensity=0.55,
+            complexity=0.35,
+            tightness=0.7,
+        )
         ctrl = Controls(
             length_bars=4,
             bpm=120,
             key_name="C",
             mode="major",
-            density=0.5,
-            syncopation=0.4,
-            swing=0.0,
-            chord_complexity=0.3,
-            repetition=0.5,
-            variation=0.4,
-            energy=0.6,
-            cadence_strength=0.5,
-            humanize_timing_ms=0.0,
-            humanize_velocity=0.0,
-            progression_style="pop",
             seed=7,
+            style_mood=style_mood,
+            derived=map_controls(style_mood, seed=7),
         )
         _, _, _, _, report = build_song_bundle(ctrl)
         self.assertIn("plugins", report)

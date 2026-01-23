@@ -179,7 +179,7 @@ def _resolve_token_to_chord(tonic_pc: int, mode: str, token, rng: random.Random)
 
 
 def _choose_extension(ctrl, rng: random.Random, section: str, label: str, quality: str) -> str:
-    c = clamp01(ctrl.chord_complexity)
+    c = clamp01(ctrl.derived.chord_complexity)
     if section == "chorus":
         c = clamp01(c * 1.15)
 
@@ -264,7 +264,7 @@ def make_chord_segment(
     plan: SongPlan,
 ) -> ChordSegment:
     mod = plan.bar_mods[bar]
-    chord_complexity_eff = clamp01(ctrl.chord_complexity * mod.chord_comp_mul)
+    chord_complexity_eff = clamp01(ctrl.derived.chord_complexity * mod.chord_comp_mul)
 
     root_pc, quality, label, is_borrowed, _tok_tag = _resolve_token_to_chord(tonic_pc, ctrl.mode, token, rng)
 
@@ -272,7 +272,7 @@ def make_chord_segment(
         label = forced_label
 
     if ctrl.mode == "major":
-        mixture_prob = clamp01(lerp(0.00, 0.12, chord_complexity_eff) * lerp(0.25, 1.00, ctrl.variation))
+        mixture_prob = clamp01(lerp(0.00, 0.12, chord_complexity_eff) * lerp(0.25, 1.00, ctrl.derived.variation))
         mixture_prob *= (1.05 if section in ("bridge", "chorus") else 0.80)
         if (not is_borrowed) and rng.random() < mixture_prob:
             # Expanded modal interchange palette (major-key defaults).
@@ -340,8 +340,8 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
     segments: list[ChordSegment] = []
 
     length = max(1, int(ctrl.length_bars))
-    style_key = (ctrl.progression_style or "pop").strip().lower()
-    base_two_prob = clamp01(lerp(0.06, 0.40, (ctrl.density * 0.55 + ctrl.variation * 0.45)))
+    style_key = (ctrl.derived.progression_style or "pop").strip().lower()
+    base_two_prob = clamp01(lerp(0.06, 0.40, (ctrl.derived.density * 0.55 + ctrl.derived.variation * 0.45)))
     if style_key == "jazz":
         base_two_prob = clamp01(base_two_prob * 1.55 + 0.12)
     elif style_key == "pop":
@@ -366,9 +366,9 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
 
         do_turnaround = False
         if mod.is_phrase_end and bar != length - 1:
-            do_turnaround = (rng.random() < clamp01(lerp(0.20, 0.75, ctrl.cadence_strength)))
+            do_turnaround = (rng.random() < clamp01(lerp(0.20, 0.75, ctrl.derived.cadence_strength)))
 
-        cadence_prob = clamp01(lerp(0.25, 0.85, ctrl.cadence_strength))
+        cadence_prob = clamp01(lerp(0.25, 0.85, ctrl.derived.cadence_strength))
         if style_key == "jazz":
             cadence_prob = clamp01(cadence_prob * 1.15)
         elif style_key == "pop":
@@ -426,7 +426,7 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
             segments.extend([seg1, seg2])
             continue
 
-        if bar == length - 1 and ctrl.cadence_strength >= 0.45:
+        if bar == length - 1 and ctrl.derived.cadence_strength >= 0.45:
             cadence_choice = pick_weighted(rng, [("V_I", 0.75), ("IV_I", 0.25)])
             if cadence_choice == "V_I":
                 tok1, tok2 = 4, 0
@@ -510,7 +510,7 @@ def build_chord_segments(ctrl: Controls, plan: SongPlan | None = None):
 
         if rng.random() < two_prob:
             next_token = degrees[(pos_in_phrase + 1) % len(degrees)]
-            if rng.random() < lerp(0.18, 0.42, ctrl.energy):
+            if rng.random() < lerp(0.18, 0.42, ctrl.derived.energy):
                 next_token = 4
             seg1 = make_chord_segment(
                 ctrl=ctrl,
@@ -586,9 +586,9 @@ def generate_harmony_track(ctrl: Controls, chord_segments: list[ChordSegment], p
     events.append((0, Message("program_change", channel=HARMONY_CH, program=GM_PIANO, time=0)))
 
     voice_count = 3
-    if ctrl.chord_complexity >= 0.55:
+    if ctrl.derived.chord_complexity >= 0.55:
         voice_count = 4
-    if ctrl.chord_complexity >= 0.85 and rng.random() < 0.35:
+    if ctrl.derived.chord_complexity >= 0.85 and rng.random() < 0.35:
         voice_count = 5
 
     prev_voicing: list[int] = []
@@ -596,8 +596,8 @@ def generate_harmony_track(ctrl: Controls, chord_segments: list[ChordSegment], p
     for seg in chord_segments:
         mod = plan.bar_mods[seg.bar_index]
 
-        density_eff = clamp01(ctrl.density * mod.density_mul)
-        energy_eff = clamp01(ctrl.energy * mod.energy_mul)
+        density_eff = clamp01(ctrl.derived.density * mod.density_mul)
+        energy_eff = clamp01(ctrl.derived.energy * mod.energy_mul)
 
         chord_notes = chord_tones_in_range(seg.pcs, low, high)
         if not chord_notes:
@@ -628,10 +628,10 @@ def generate_harmony_track(ctrl: Controls, chord_segments: list[ChordSegment], p
         do_pulse = (rng.random() < pulse_prob)
 
         if not do_pulse:
-            on_tick = seg_start + apply_swing_to_step(seg.start_step, ctrl.swing) + humanize_ticks(rng, ctrl.humanize_timing_ms, ctrl.bpm)
+            on_tick = seg_start + apply_swing_to_step(seg.start_step, ctrl.derived.swing) + humanize_ticks(rng, ctrl.derived.humanize_timing_ms, ctrl.bpm)
             off_tick = seg_end
             for n in voicing:
-                vel = velocity_humanize(rng, base_vel, ctrl.humanize_velocity)
+                vel = velocity_humanize(rng, base_vel, ctrl.derived.humanize_velocity)
                 events.append((max(0, on_tick), Message("note_on", channel=HARMONY_CH, note=n, velocity=vel, time=0)))
             for n in voicing:
                 events.append((max(0, off_tick), Message("note_off", channel=HARMONY_CH, note=n, velocity=0, time=0)))
@@ -641,16 +641,16 @@ def generate_harmony_track(ctrl: Controls, chord_segments: list[ChordSegment], p
             start_tick = seg_start
             end_tick = seg_end
 
-            use_8ths = (mod.is_phrase_end and rng.random() < lerp(0.10, 0.45, ctrl.variation))
+            use_8ths = (mod.is_phrase_end and rng.random() < lerp(0.10, 0.45, ctrl.derived.variation))
             pulse_step = ticks_per_8th if use_8ths else ticks_per_beat
             pulse_len = ticks_per_8th
 
             t = start_tick
             while t < end_tick:
-                on_tick = t + humanize_ticks(rng, ctrl.humanize_timing_ms, ctrl.bpm)
+                on_tick = t + humanize_ticks(rng, ctrl.derived.humanize_timing_ms, ctrl.bpm)
                 off_tick = min(end_tick, on_tick + pulse_len)
                 for n in voicing:
-                    vel = velocity_humanize(rng, base_vel, ctrl.humanize_velocity)
+                    vel = velocity_humanize(rng, base_vel, ctrl.derived.humanize_velocity)
                     events.append((max(0, on_tick), Message("note_on", channel=HARMONY_CH, note=n, velocity=vel, time=0)))
                 for n in voicing:
                     events.append((max(0, off_tick), Message("note_off", channel=HARMONY_CH, note=n, velocity=0, time=0)))

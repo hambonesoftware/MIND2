@@ -91,19 +91,19 @@ def generate_bass_track(ctrl: Controls, chord_segments: list[ChordSegment], plan
     events = []
     events.append((0, Message("program_change", channel=BASS_CH, program=GM_BASS, time=0)))
 
-    base_vel_global = int(round(lerp(62, 98, ctrl.energy)))
+    base_vel_global = int(round(lerp(62, 98, ctrl.derived.energy)))
 
-    bass_cell = _choose_bass_cell(rng, plan.rhythm.archetype, ctrl.progression_style)
+    bass_cell = _choose_bass_cell(rng, plan.rhythm.archetype, ctrl.derived.progression_style)
 
-    anticipate_prob_base = clamp01(lerp(0.05, 0.35, ctrl.syncopation))
-    approach_prob_base = clamp01(lerp(0.03, 0.16, ctrl.chord_complexity))
+    anticipate_prob_base = clamp01(lerp(0.05, 0.35, ctrl.derived.syncopation))
+    approach_prob_base = clamp01(lerp(0.03, 0.16, ctrl.derived.chord_complexity))
 
     for seg in chord_segments:
         mod = plan.bar_mods[seg.bar_index]
 
-        density_eff = clamp01(ctrl.density * mod.density_mul)
-        sync_eff = clamp01(ctrl.syncopation * mod.sync_mul)
-        energy_eff = clamp01(ctrl.energy * mod.energy_mul)
+        density_eff = clamp01(ctrl.derived.density * mod.density_mul)
+        sync_eff = clamp01(ctrl.derived.syncopation * mod.sync_mul)
+        energy_eff = clamp01(ctrl.derived.energy * mod.energy_mul)
 
         base_vel = int(round(base_vel_global * lerp(0.90, 1.10, energy_eff)))
 
@@ -150,8 +150,8 @@ def generate_bass_track(ctrl: Controls, chord_segments: list[ChordSegment], plan
                 place_step -= 2
 
             on_tick = bar_step_to_abs_tick(seg.bar_index, place_step)
-            on_tick += apply_swing_to_step(place_step, ctrl.swing)
-            on_tick += humanize_ticks(rng, ctrl.humanize_timing_ms, ctrl.bpm)
+            on_tick += apply_swing_to_step(place_step, ctrl.derived.swing)
+            on_tick += humanize_ticks(rng, ctrl.derived.humanize_timing_ms, ctrl.bpm)
 
             dur_steps = 2 if (density_eff > 0.60 or mod.section == "chorus") else 4
             off_step = min(seg.end_step, place_step + dur_steps)
@@ -167,14 +167,14 @@ def generate_bass_track(ctrl: Controls, chord_segments: list[ChordSegment], plan
                         neigh = nearest_in_set(root_note + 2, pool)
 
                     a_on = bar_step_to_abs_tick(seg.bar_index, place_step)
-                    a_on += humanize_ticks(rng, ctrl.humanize_timing_ms, ctrl.bpm)
+                    a_on += humanize_ticks(rng, ctrl.derived.humanize_timing_ms, ctrl.bpm)
                     a_off = bar_step_to_abs_tick(seg.bar_index, min(seg.end_step, place_step + 1))
-                    vel_a = velocity_humanize(rng, int(base_vel * 0.78), ctrl.humanize_velocity)
+                    vel_a = velocity_humanize(rng, int(base_vel * 0.78), ctrl.derived.humanize_velocity)
                     events.append((max(0, a_on), Message("note_on", channel=BASS_CH, note=neigh, velocity=vel_a, time=0)))
                     events.append((max(0, a_off), Message("note_off", channel=BASS_CH, note=neigh, velocity=0, time=0)))
 
                     on_tick = bar_step_to_abs_tick(seg.bar_index, min(seg.end_step - 1, place_step + 1))
-                    on_tick += humanize_ticks(rng, ctrl.humanize_timing_ms, ctrl.bpm)
+                    on_tick += humanize_ticks(rng, ctrl.derived.humanize_timing_ms, ctrl.bpm)
 
             note_to_play = root_note
 
@@ -183,7 +183,7 @@ def generate_bass_track(ctrl: Controls, chord_segments: list[ChordSegment], plan
                 if oct_note <= high and rng.random() < 0.55:
                     note_to_play = oct_note
 
-            vel = velocity_humanize(rng, base_vel, ctrl.humanize_velocity)
+            vel = velocity_humanize(rng, base_vel, ctrl.derived.humanize_velocity)
             events.append((max(0, on_tick), Message("note_on", channel=BASS_CH, note=note_to_play, velocity=vel, time=0)))
             events.append((max(0, off_tick), Message("note_off", channel=BASS_CH, note=note_to_play, velocity=0, time=0)))
 

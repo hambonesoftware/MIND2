@@ -58,7 +58,7 @@ def generate_melody_track(
     rng = random.Random(ctrl.seed + 303)
     tonic_pc = key_to_pc(ctrl.key_name)
     scale = scale_pcs(tonic_pc, ctrl.mode)
-    style_key = (style or ctrl.progression_style or "pop").strip().lower()
+    style_key = (style or ctrl.derived.progression_style or "pop").strip().lower()
 
     melody_base, _, _ = choose_register_base()
 
@@ -70,11 +70,11 @@ def generate_melody_track(
 
     def bar_density_energy_sync(bar_index: int):
         mod = plan.bar_mods[bar_index]
-        density_eff = clamp01(ctrl.density * mod.density_mul)
-        energy_eff = clamp01(ctrl.energy * mod.energy_mul)
-        sync_eff = clamp01(ctrl.syncopation * mod.sync_mul)
-        variation_eff = clamp01(ctrl.variation * mod.variation_mul)
-        repetition_eff = clamp01(ctrl.repetition * mod.repetition_mul)
+        density_eff = clamp01(ctrl.derived.density * mod.density_mul)
+        energy_eff = clamp01(ctrl.derived.energy * mod.energy_mul)
+        sync_eff = clamp01(ctrl.derived.syncopation * mod.sync_mul)
+        variation_eff = clamp01(ctrl.derived.variation * mod.variation_mul)
+        repetition_eff = clamp01(ctrl.derived.repetition * mod.repetition_mul)
         return mod, density_eff, energy_eff, sync_eff, variation_eff, repetition_eff
 
     def build_bar_notes(bar_index: int):
@@ -230,7 +230,7 @@ def generate_melody_track(
                 vel = int(round(base_vel * lerp(1.05, 1.22, clamp01(energy_eff))))
             else:
                 vel = int(round(base_vel * lerp(0.75, 1.00, clamp01(energy_eff))))
-            vel = velocity_humanize(rng, vel, ctrl.humanize_velocity)
+            vel = velocity_humanize(rng, vel, ctrl.derived.humanize_velocity)
 
             bar_notes.append((0, s, note, dur_steps, vel))
 
@@ -246,7 +246,7 @@ def generate_melody_track(
                     pickup_step = 14 if rng.random() < 0.65 else 15
                     tgt2 = step_target(pickup_step) + 2
                     pickup_note = nearest_in_set(tgt2, next_choices)
-                    pickup_vel = velocity_humanize(rng, int(lerp(60, 105, energy_eff)), ctrl.humanize_velocity)
+                    pickup_vel = velocity_humanize(rng, int(lerp(60, 105, energy_eff)), ctrl.derived.humanize_velocity)
                     bar_notes.append((0, pickup_step, pickup_note, 1, pickup_vel))
                     bar_notes = sorted(bar_notes, key=lambda x: x[1])
 
@@ -261,8 +261,8 @@ def generate_melody_track(
         bar_events = build_bar_notes(bar)
         for _, step, note, dur_steps, vel in bar_events:
             on_tick = bar_step_to_abs_tick(bar, step)
-            on_tick += apply_swing_to_step(step, ctrl.swing)
-            on_tick += humanize_ticks(rng, ctrl.humanize_timing_ms, ctrl.bpm)
+            on_tick += apply_swing_to_step(step, ctrl.derived.swing)
+            on_tick += humanize_ticks(rng, ctrl.derived.humanize_timing_ms, ctrl.bpm)
 
             off_step = min(16, step + dur_steps)
             off_tick = bar_step_to_abs_tick(bar, off_step)

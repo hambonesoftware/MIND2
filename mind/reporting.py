@@ -39,14 +39,14 @@ def build_song_report(
     run_plugins: bool = True,
 ):
     """Build a JSON-serializable report for later analysis."""
-    style_key = (ctrl.progression_style or "pop").strip().lower()
+    style_key = (ctrl.derived.progression_style or "pop").strip().lower()
     report: dict[str, Any] = {
         "report_version": "pop_knob_player_v2",
         "controls": asdict(ctrl),
         "style_profile": {
             "style": style_key,
             "rhythm_archetype": plan.rhythm.archetype,
-            "swing_amount": ctrl.swing,
+            "swing_amount": ctrl.derived.swing,
             "style_rules_applied": style_key in STYLE_RHYTHM_ARCHETYPES,
         },
         "profiles": {

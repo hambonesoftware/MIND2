@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox, ttk
 import mido
 from mido import Message, MidiFile
 
-from .constants import DEFAULT_SEED, NOTE_NAMES
+from .constants import DEFAULT_SEED, NOTE_NAMES, level2_knob_label, level2_knob_range
 from .control_mapping import map_controls
 from .models import Controls, Level2Knobs, StyleMoodControls
 from .midi_build import build_midifile, build_song_bundle
@@ -87,6 +87,8 @@ class App(tk.Tk):
         self._cached_report = None
         self._level2_groove_combo: ttk.Combobox | None = None
         self._level2_lift_combo: ttk.Combobox | None = None
+        self._level2_slider_labels: dict[str, ttk.Label] = {}
+        self._level2_combo_labels: dict[str, ttk.Label] = {}
 
         self._build_ui()
         self._refresh_outputs()
@@ -209,90 +211,22 @@ class App(tk.Tk):
             command=self._regenerate,
         ).pack(side="left")
 
-        self._add_slider(
-            self.grp_advanced,
-            "Functional Clarity",
-            self.var_level2_functional_clarity,
-            0.0,
-            1.0,
-            self._regenerate,
-        )
-        self._add_slider(
-            self.grp_advanced,
-            "Chromaticism",
-            self.var_level2_chromaticism,
-            0.0,
-            1.0,
-            self._regenerate,
-        )
-        self._add_slider(
-            self.grp_advanced,
-            "Extension Richness",
-            self.var_level2_extension_richness,
-            0.0,
-            1.0,
-            self._regenerate,
-        )
-        self._add_slider(
-            self.grp_advanced,
-            "Turnaround Intensity",
-            self.var_level2_turnaround_intensity,
-            0.0,
-            1.0,
-            self._regenerate,
-        )
-        self._add_slider(
-            self.grp_advanced,
-            "Swing Amount",
-            self.var_level2_swing_amount,
-            0.0,
-            1.0,
-            self._regenerate,
-        )
-        self._add_slider(
-            self.grp_advanced,
-            "Syncopation",
-            self.var_level2_syncopation,
-            0.0,
-            1.0,
-            self._regenerate,
-        )
-        self._add_slider(
-            self.grp_advanced,
-            "Chord Tone Anchoring",
-            self.var_level2_chord_tone_anchoring,
-            0.0,
-            1.0,
-            self._regenerate,
-        )
-        self._add_slider(
-            self.grp_advanced,
-            "Melodic Range",
-            self.var_level2_melodic_range,
-            0.0,
-            1.0,
-            self._regenerate,
-        )
-        self._add_slider(
-            self.grp_advanced,
-            "Motif Repetition",
-            self.var_level2_motif_repetition,
-            0.0,
-            1.0,
-            self._regenerate,
-        )
-        self._add_slider(
-            self.grp_advanced,
-            "Form Strictness",
-            self.var_level2_form_strictness,
-            0.0,
-            1.0,
-            self._regenerate,
-        )
+        self._add_level2_slider("functional_clarity", self.var_level2_functional_clarity)
+        self._add_level2_slider("chromaticism", self.var_level2_chromaticism)
+        self._add_level2_slider("extension_richness", self.var_level2_extension_richness)
+        self._add_level2_slider("turnaround_intensity", self.var_level2_turnaround_intensity)
+        self._add_level2_slider("swing_amount", self.var_level2_swing_amount)
+        self._add_level2_slider("syncopation", self.var_level2_syncopation)
+        self._add_level2_slider("chord_tone_anchoring", self.var_level2_chord_tone_anchoring)
+        self._add_level2_slider("melodic_range", self.var_level2_melodic_range)
+        self._add_level2_slider("motif_repetition", self.var_level2_motif_repetition)
+        self._add_level2_slider("form_strictness", self.var_level2_form_strictness)
 
         l2_rows = ttk.Frame(self.grp_advanced)
         l2_rows.pack(fill="x", pady=4)
-        ttk.Label(l2_rows, text="Groove Archetype:", width=18).pack(side="left")
+        groove_label = ttk.Label(l2_rows, text="Groove Archetype:", width=18)
+        groove_label.pack(side="left")
+        self._level2_combo_labels["groove_archetype"] = groove_label
         self._level2_groove_combo = ttk.Combobox(
             l2_rows,
             textvariable=self.var_level2_groove,
@@ -302,7 +236,9 @@ class App(tk.Tk):
         )
         self._level2_groove_combo.pack(side="left", padx=(0, 6))
         self._level2_groove_combo.bind("<<ComboboxSelected>>", lambda e: self._regenerate())
-        ttk.Label(l2_rows, text="Lift Profile:", width=12).pack(side="left")
+        lift_label = ttk.Label(l2_rows, text="Lift Profile:", width=12)
+        lift_label.pack(side="left")
+        self._level2_combo_labels["lift_profile"] = lift_label
         self._level2_lift_combo = ttk.Combobox(
             l2_rows,
             textvariable=self.var_level2_lift,
@@ -341,11 +277,12 @@ class App(tk.Tk):
         status.pack(fill="x", pady=(10, 0))
         ttk.Label(status, textvariable=self.status_text).pack(side="left")
 
-    def _add_slider(self, parent, label, var, vmin, vmax, on_change, resolution=0.01):
+    def _add_slider(self, parent, label, var, vmin, vmax, on_change, resolution=0.01, return_label=False):
         frame = ttk.Frame(parent)
         frame.pack(fill="x", padx=8, pady=4)
 
-        ttk.Label(frame, text=label, width=18).pack(side="left")
+        label_widget = ttk.Label(frame, text=label, width=18)
+        label_widget.pack(side="left")
         scale = ttk.Scale(frame, from_=vmin, to=vmax, variable=var, orient="horizontal", command=lambda _e: on_change())
         scale.pack(side="left", fill="x", expand=True, padx=(6, 8))
 
@@ -360,7 +297,33 @@ class App(tk.Tk):
                 val_label.configure(text=f"{v:.2f}")
 
         var.trace_add("write", lambda *_: update_label())
+        if return_label:
+            return label_widget, scale
         return scale
+
+    def _current_style_key(self) -> str:
+        style_label = str(self.var_style.get() or "Modern Pop")
+        return self.STYLE_LABELS.get(style_label, "pop")
+
+    def _add_level2_slider(self, knob_key: str, var: tk.DoubleVar):
+        knob_range = level2_knob_range(knob_key) or (0.0, 1.0)
+        label = level2_knob_label(knob_key, self._current_style_key())
+        label_widget, _ = self._add_slider(
+            self.grp_advanced,
+            label,
+            var,
+            knob_range[0],
+            knob_range[1],
+            self._regenerate,
+            return_label=True,
+        )
+        self._level2_slider_labels[knob_key] = label_widget
+
+    def _update_level2_labels(self, style_key: str):
+        for knob_key, label_widget in self._level2_slider_labels.items():
+            label_widget.configure(text=level2_knob_label(knob_key, style_key))
+        for knob_key, label_widget in self._level2_combo_labels.items():
+            label_widget.configure(text=f"{level2_knob_label(knob_key, style_key)}:")
 
     def _toggle_advanced(self):
         if self.var_show_advanced.get():
@@ -369,6 +332,7 @@ class App(tk.Tk):
             self.grp_advanced.pack_forget()
 
     def _sync_level2_vars(self, derived):
+        self._update_level2_labels(derived.level1.style)
         if self._level2_groove_combo is not None:
             self._level2_groove_combo["values"] = [name for name, _ in derived.style_profile.groove_archetypes]
         if self._level2_lift_combo is not None:
@@ -560,28 +524,41 @@ class App(tk.Tk):
         lines.append(f"  chord_complexity={ctrl.derived.chord_complexity:.2f}, repetition={ctrl.derived.repetition:.2f}, variation={ctrl.derived.variation:.2f}")
         lines.append(f"  energy={ctrl.derived.energy:.2f}, cadence_strength={ctrl.derived.cadence_strength:.2f}")
         lines.append(f"  humanize_timing_ms={ctrl.derived.humanize_timing_ms:.1f}, humanize_velocity={ctrl.derived.humanize_velocity:.2f}")
-        lines.append(f"  groove={ctrl.derived.level2.groove_archetype}, lift={ctrl.derived.level2.lift_profile}")
+        style_key = ctrl.style_mood.style
+        groove_label = level2_knob_label("groove_archetype", style_key)
+        lift_label = level2_knob_label("lift_profile", style_key)
+        lines.append(f"  {groove_label}={ctrl.derived.level2.groove_archetype}, {lift_label}={ctrl.derived.level2.lift_profile}")
         lines.append("  Level 2 Mapping:")
         lines.append(
-            "    functional_clarity={:.2f}, chromaticism={:.2f}, extension_richness={:.2f}".format(
-                ctrl.derived.level2.functional_clarity,
-                ctrl.derived.level2.chromaticism,
-                ctrl.derived.level2.extension_richness,
+            "    {fc}={fcv:.2f}, {ch}={chv:.2f}, {er}={erv:.2f}".format(
+                fc=level2_knob_label("functional_clarity", style_key),
+                fcv=ctrl.derived.level2.functional_clarity,
+                ch=level2_knob_label("chromaticism", style_key),
+                chv=ctrl.derived.level2.chromaticism,
+                er=level2_knob_label("extension_richness", style_key),
+                erv=ctrl.derived.level2.extension_richness,
             )
         )
         lines.append(
-            "    turnaround_intensity={:.2f}, chord_tone_anchoring={:.2f}, melodic_range={:.2f}".format(
-                ctrl.derived.level2.turnaround_intensity,
-                ctrl.derived.level2.chord_tone_anchoring,
-                ctrl.derived.level2.melodic_range,
+            "    {ti}={tiv:.2f}, {cta}={ctav:.2f}, {mr}={mrv:.2f}".format(
+                ti=level2_knob_label("turnaround_intensity", style_key),
+                tiv=ctrl.derived.level2.turnaround_intensity,
+                cta=level2_knob_label("chord_tone_anchoring", style_key),
+                ctav=ctrl.derived.level2.chord_tone_anchoring,
+                mr=level2_knob_label("melodic_range", style_key),
+                mrv=ctrl.derived.level2.melodic_range,
             )
         )
         lines.append(
-            "    motif_repetition={:.2f}, form_strictness={:.2f}, swing_amount={:.2f}, syncopation={:.2f}".format(
-                ctrl.derived.level2.motif_repetition,
-                ctrl.derived.level2.form_strictness,
-                ctrl.derived.level2.swing_amount,
-                ctrl.derived.level2.syncopation,
+            "    {mrp}={mrpv:.2f}, {fs}={fsv:.2f}, {sa}={sav:.2f}, {sy}={syv:.2f}".format(
+                mrp=level2_knob_label("motif_repetition", style_key),
+                mrpv=ctrl.derived.level2.motif_repetition,
+                fs=level2_knob_label("form_strictness", style_key),
+                fsv=ctrl.derived.level2.form_strictness,
+                sa=level2_knob_label("swing_amount", style_key),
+                sav=ctrl.derived.level2.swing_amount,
+                sy=level2_knob_label("syncopation", style_key),
+                syv=ctrl.derived.level2.syncopation,
             )
         )
         lines.append("")

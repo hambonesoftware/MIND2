@@ -128,3 +128,86 @@ STYLE_GROOVE_ARCHETYPES = {
         ("four_on_floor", 0.20),
     ),
 }
+
+LEVEL2_KNOB_METADATA = {
+    "functional_clarity": {
+        "display_name": "Functional Clarity",
+        "tooltip": "How clearly the harmony resolves to functional centers.",
+        "range": (0.0, 1.0),
+    },
+    "chromaticism": {
+        "display_name": "Chromaticism",
+        "tooltip": "Amount of non-diatonic tones and borrowed color.",
+        "range": (0.0, 1.0),
+    },
+    "extension_richness": {
+        "display_name": "Extension Richness",
+        "tooltip": "Density of chord extensions beyond triads.",
+        "range": (0.0, 1.0),
+    },
+    "turnaround_intensity": {
+        "display_name": "Turnaround Intensity",
+        "tooltip": "Strength of cadential pull at phrase ends.",
+        "range": (0.0, 1.0),
+    },
+    "groove_archetype": {
+        "display_name": "Groove Archetype",
+        "tooltip": "Core rhythmic feel family used by the drummer.",
+        "range": None,
+    },
+    "swing_amount": {
+        "display_name": "Swing Amount",
+        "tooltip": "Delay off-beat subdivisions for swing or shuffle feel.",
+        "range": (0.0, 1.0),
+        "style_labels": {
+            "rock": "Swing/Shuffle",
+            "early_rock_roll": "Swing/Shuffle",
+            "jazz": "Swing",
+        },
+    },
+    "syncopation": {
+        "display_name": "Syncopation",
+        "tooltip": "Emphasis on off-beats and unexpected accents.",
+        "range": (0.0, 1.0),
+    },
+    "chord_tone_anchoring": {
+        "display_name": "Chord Tone Anchoring",
+        "tooltip": "How strongly melodies land on chord tones.",
+        "range": (0.0, 1.0),
+    },
+    "melodic_range": {
+        "display_name": "Melodic Range",
+        "tooltip": "Span between lowest and highest melody notes.",
+        "range": (0.0, 1.0),
+    },
+    "motif_repetition": {
+        "display_name": "Motif Repetition",
+        "tooltip": "Reuse of melodic motifs across phrases.",
+        "range": (0.0, 1.0),
+    },
+    "form_strictness": {
+        "display_name": "Form Strictness",
+        "tooltip": "How rigidly phrases adhere to form templates.",
+        "range": (0.0, 1.0),
+    },
+    "lift_profile": {
+        "display_name": "Lift Profile",
+        "tooltip": "Energy-lift pattern across sections.",
+        "range": None,
+    },
+}
+
+
+def level2_knob_label(knob_key: str, style: str | None = None) -> str:
+    meta = LEVEL2_KNOB_METADATA.get(knob_key, {})
+    if style:
+        style_key = style.strip().lower()
+        style_labels = meta.get("style_labels", {})
+        if style_key in style_labels:
+            return style_labels[style_key]
+    return meta.get("display_name", knob_key)
+
+
+def level2_knob_range(knob_key: str) -> tuple[float, float] | None:
+    meta = LEVEL2_KNOB_METADATA.get(knob_key, {})
+    return meta.get("range")

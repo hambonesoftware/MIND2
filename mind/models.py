@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .control_mapping import DerivedControls, StyleMoodControls
 from .theory.chords import ChordSpec
 
 
@@ -11,23 +12,9 @@ class Controls:
     bpm: int
     key_name: str
     mode: str  # "major" or "minor" (minor is natural minor)
-
-    # normalized knobs 0..1
-    density: float
-    syncopation: float
-    swing: float
-    chord_complexity: float
-    repetition: float
-    variation: float
-    energy: float
-    cadence_strength: float
-
-    humanize_timing_ms: float
-    humanize_velocity: float
-
-    progression_style: str
-
     seed: int
+    style_mood: StyleMoodControls
+    derived: DerivedControls
 
 
 @dataclass

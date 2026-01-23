@@ -5,7 +5,7 @@ import random
 
 from .models import BarModifiers, MelodyContourProfile, RhythmProfile, SectionDef, SongPlan
 from .utils import clamp, clamp01, lerp, pick_weighted
-from .constants import DEFAULT_SEED, STYLE_RHYTHM_ARCHETYPES, STYLE_SWING_DEFAULTS
+from .constants import STYLE_RHYTHM_ARCHETYPES
 from .theory.progression import ProgressionGenerator
 
 
@@ -98,7 +98,7 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
     Pick chord templates per section type. Returns:
       templates[section] = {"name": ..., "degrees": [...], "source": ...}
     """
-    all_templates = get_pop_templates(rng, ctrl.mode, ctrl.progression_style)
+    all_templates = get_pop_templates(rng, ctrl.mode, ctrl.derived.progression_style)
 
     chorus_pool = []
     verse_pool = []
@@ -117,7 +117,7 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
         if "simple" in tags:
             wc *= 1.2
         if "mixture" in tags:
-            wc *= lerp(0.8, 1.35, ctrl.chord_complexity)
+            wc *= lerp(0.8, 1.35, ctrl.derived.chord_complexity)
 
         # verse likes a bit more functional variety
         wv = 1.0
@@ -126,7 +126,7 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
         if "smooth" in tags:
             wv *= 1.3
         if "mixture" in tags:
-            wv *= lerp(0.7, 1.45, ctrl.variation)
+            wv *= lerp(0.7, 1.45, ctrl.derived.variation)
 
         # bridge likes contrast and mixture/functional
         wb = 1.0
@@ -165,13 +165,13 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
     bridge_t = pick_template(bridge_pool)
 
     # repetition affects template matching
-    if ctrl.repetition >= 0.70 and rng.random() < lerp(0.35, 0.75, ctrl.repetition):
+    if ctrl.derived.repetition >= 0.70 and rng.random() < lerp(0.35, 0.75, ctrl.derived.repetition):
         anthem_candidates = [t for t in all_templates if "anthem" in (t.get("tags") or [])]
         if anthem_candidates:
             chosen = rng.choice(anthem_candidates)
             chorus_t = {"name": chosen["name"], "degrees": chosen["degrees"], "source": "seed_library_anthem"}
 
-    if ctrl.repetition >= 0.80 and rng.random() < lerp(0.20, 0.65, ctrl.repetition):
+    if ctrl.derived.repetition >= 0.80 and rng.random() < lerp(0.20, 0.65, ctrl.derived.repetition):
         chorus_t = verse_t
 
     return {
@@ -186,11 +186,7 @@ def choose_section_templates(ctrl, rng: random.Random) -> dict:
 def build_rhythm_profile(ctrl, rng_master: random.Random) -> RhythmProfile:
     rng = random.Random(rng_master.randint(0, 2**31 - 1))
 
-    style_key = (ctrl.progression_style or "").lower()
-    if ctrl.swing <= 0.01:
-        swing_range = STYLE_SWING_DEFAULTS.get(style_key)
-        if swing_range:
-            ctrl.swing = clamp01(rng.uniform(*swing_range))
+    style_key = (ctrl.derived.progression_style or "").lower()
 
     archetypes = STYLE_RHYTHM_ARCHETYPES.get(
         style_key,
@@ -208,23 +204,23 @@ def build_rhythm_profile(ctrl, rng_master: random.Random) -> RhythmProfile:
     if archetype == "straight_pop":
         base_kick = [0, 8]
         base_snare = [4, 12]
-        hat_16th_bias = lerp(0.10, 0.55, ctrl.density)
-        kick_sync_bias = lerp(0.08, 0.40, ctrl.syncopation)
+        hat_16th_bias = lerp(0.10, 0.55, ctrl.derived.density)
+        kick_sync_bias = lerp(0.08, 0.40, ctrl.derived.syncopation)
     elif archetype == "four_on_floor":
         base_kick = [0, 4, 8, 12]
         base_snare = [4, 12]
-        hat_16th_bias = lerp(0.10, 0.65, ctrl.density)
-        kick_sync_bias = lerp(0.05, 0.25, ctrl.syncopation)
+        hat_16th_bias = lerp(0.10, 0.65, ctrl.derived.density)
+        kick_sync_bias = lerp(0.05, 0.25, ctrl.derived.syncopation)
     elif archetype == "half_time":
         base_kick = [0, 6, 8]
         base_snare = [8]
-        hat_16th_bias = lerp(0.08, 0.55, ctrl.density)
-        kick_sync_bias = lerp(0.12, 0.55, ctrl.syncopation)
+        hat_16th_bias = lerp(0.08, 0.55, ctrl.derived.density)
+        kick_sync_bias = lerp(0.12, 0.55, ctrl.derived.syncopation)
     else:  # bouncy
         base_kick = [0, 7, 10]
         base_snare = [4, 12]
-        hat_16th_bias = lerp(0.18, 0.80, ctrl.density)
-        kick_sync_bias = lerp(0.15, 0.60, ctrl.syncopation)
+        hat_16th_bias = lerp(0.18, 0.80, ctrl.derived.density)
+        kick_sync_bias = lerp(0.15, 0.60, ctrl.derived.syncopation)
 
     fill_style = pick_weighted(rng, [("snare_roll", 0.60), ("tom_fill", 0.40)])
 
@@ -242,7 +238,7 @@ def build_rhythm_profile(ctrl, rng_master: random.Random) -> RhythmProfile:
 def build_melody_contour(ctrl, rng_master: random.Random) -> MelodyContourProfile:
     rng = random.Random(rng_master.randint(0, 2**31 - 1))
 
-    style_key = (ctrl.progression_style or "pop").strip().lower()
+    style_key = (ctrl.derived.progression_style or "pop").strip().lower()
     if style_key == "pop":
         kinds = [
             ("arch", 0.34),
@@ -281,7 +277,7 @@ def build_melody_contour(ctrl, rng_master: random.Random) -> MelodyContourProfil
         intensity_bounds = (0.35, 1.00)
     kind = pick_weighted(rng, kinds)
 
-    base = (ctrl.variation * 0.6 + ctrl.energy * 0.4)
+    base = (ctrl.derived.variation * 0.6 + ctrl.derived.energy * 0.4)
     intensity = clamp01(lerp(intensity_bounds[0], intensity_bounds[1], base))
     intensity = clamp01(intensity * lerp(0.88, 1.08, rng.random()))
 
@@ -359,9 +355,9 @@ def build_song_plan(ctrl) -> SongPlan:
             melody_shift = int(round(lerp(-3, +1, rng.random())))
 
         if is_phrase_end and b != length - 1:
-            energy_mul *= lerp(1.03, 1.10, clamp01(ctrl.cadence_strength))
-            sync_mul *= lerp(1.00, 1.10, clamp01(ctrl.syncopation))
-            var_mul *= lerp(1.02, 1.20, clamp01(ctrl.variation))
+            energy_mul *= lerp(1.03, 1.10, clamp01(ctrl.derived.cadence_strength))
+            sync_mul *= lerp(1.00, 1.10, clamp01(ctrl.derived.syncopation))
+            var_mul *= lerp(1.02, 1.20, clamp01(ctrl.derived.variation))
 
         density_mul = clamp(density_mul, 0.55, 1.35)
         energy_mul = clamp(energy_mul, 0.55, 1.55)

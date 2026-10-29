@@ -69,7 +69,9 @@ def generate_melody_track(
     events.append((0, Message("program_change", channel=MELODY_CH, program=GM_EPIANO, time=0)))
 
     motif_len_bars = 2
-    motif_cache: list[tuple[int, int, int, int, int]] | None = None  # (bar_in_motif, step, note, dur, vel)
+    # A complete motif contains both measures. Do not reuse an incomplete motif:
+    # otherwise the second measure can be replaced with an empty event list.
+    motif_cache: dict[int, list[tuple[int, int, int, int, int]]] = {}
 
     def bar_density_energy_sync(bar_index: int):
         mod = plan.bar_mods[bar_index]
@@ -81,8 +83,6 @@ def generate_melody_track(
         return mod, density_eff, energy_eff, sync_eff, variation_eff, repetition_eff
 
     def build_bar_notes(bar_index: int):
-        nonlocal motif_cache
-
         mod, density_eff, energy_eff, sync_eff, variation_eff, repetition_eff = bar_density_energy_sync(bar_index)
 
         motif_reuse_prob = clamp01(repetition_eff)
@@ -95,9 +95,9 @@ def generate_melody_track(
         if mod.section == "chorus":
             motif_reuse_prob = clamp01(motif_reuse_prob * 0.85 + 0.05)
 
-        if motif_cache is not None and rng.random() < motif_reuse_prob:
+        if len(motif_cache) == motif_len_bars and rng.random() < motif_reuse_prob:
             bar_in_motif = (bar_index % motif_len_bars)
-            motif_events = [e for e in motif_cache if e[0] == bar_in_motif]
+            motif_events = motif_cache[bar_in_motif]
             if mod.section == "chorus" and rng.random() < lerp(0.12, 0.35, variation_eff):
                 transpose = pick_weighted(rng, [(0, 0.55), (2, 0.20), (-2, 0.20), (5, 0.05)])
                 adjusted = []
@@ -259,10 +259,10 @@ def generate_melody_track(
                     bar_notes.append((0, pickup_step, pickup_note, 1, pickup_vel))
                     bar_notes = sorted(bar_notes, key=lambda x: x[1])
 
-        if motif_cache is None and bar_index < motif_len_bars:
-            motif_cache = []
-            for e in bar_notes:
-                motif_cache.append((bar_index, e[1], e[2], e[3], e[4]))
+        if bar_index < motif_len_bars:
+            motif_cache[bar_index] = [
+                (bar_index, e[1], e[2], e[3], e[4]) for e in bar_notes
+            ]
 
         return bar_notes
 
